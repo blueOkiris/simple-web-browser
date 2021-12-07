@@ -98,7 +98,8 @@ pub fn start_browser() {
                         );
                     }
                 }, EventType::RefreshClicked => {
-
+                    via_nav_btns = true;
+                    app.web_view.reload();
                 }, EventType::ChangedPage => {
                     // Don't re-navigate after pressing back
                     if via_nav_btns {
