@@ -1,0 +1,10 @@
+appenders:
+  log_out:
+    kind: file
+    path: "swb.log"
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)(utc)} - {h({l})}: {m}{n}"
+root:
+  level: trace
+  appenders:
+    - log_out

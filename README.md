@@ -10,8 +10,8 @@ This project aims to be a simple GTK Web Browser that will support full website 
 ## Build
 
 Install Dependencies:
- - Stack (haskell)
- - Gtk
- - WebkitGtk2
+ - Rustup
+ - Gtk4
+ - Webkit2Gtk
 
-Then run the build script: `./build.sh`
+`cargo build --release`
