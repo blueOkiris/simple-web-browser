@@ -14,4 +14,7 @@ Install Dependencies:
  - Gtk3
  - Webkit2Gtk
 
+Do the first time:
+`mkdir ~/.swb; cp error-page.html ~/.swb`
+
 `cargo build --release`

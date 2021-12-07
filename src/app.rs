@@ -19,6 +19,7 @@ use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info };
 use confy::load;
 use cascade::cascade;
+use home::home_dir;
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
@@ -28,6 +29,7 @@ const APP_NAME: &'static str = "swb";
 #[derive(Serialize, Deserialize)]
 struct AppConfig {
     pub start_page: String,
+    pub search_engine: String,
     pub margin: u32
 }
 
@@ -35,6 +37,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             start_page: String::from("https://duckduckgo.org"),
+            search_engine: String::from("https://duckduckgo.com/?q=${}"),
             margin: 10
         }
     }
@@ -62,6 +65,8 @@ pub fn start_browser() {
     let mut via_nav_btns = false;
     let mut back_urls = vec![ app.cfg.start_page ];
     let mut fwd_urls = Vec::new();
+
+    let mut err_url = String::new();
 
     let event_handler = async move {
         while let Ok(event) = rx.recv().await {
@@ -115,6 +120,18 @@ pub fn start_browser() {
                     app.tb_buff.set_text(event.url.as_str());
                 }, EventType::ChangePage => {
                     app.web_view.load_uri(&event.url);
+                }, EventType::FailedChangePage => {
+                    if event.url == err_url {
+                        let home_dir =
+                            home_dir().unwrap().display().to_string();
+                        app.web_view.load_uri(
+                            (String::from("file://") + &home_dir).as_str()
+                        );
+                    } else {
+                        err_url =
+                            app.cfg.search_engine.replace("${}", &event.url);
+                        app.web_view.load_uri(err_url.as_str());
+                    }
                 }
             }
         }
@@ -129,7 +146,8 @@ enum EventType {
     ForwardClicked,
     RefreshClicked,
     ChangedPage,
-    ChangePage
+    ChangePage,
+    FailedChangePage
 }
 
 struct Event {
@@ -235,13 +253,14 @@ impl AppState {
         };
 
         // Create page view
-        let web_tx = tx.clone();
+        let web_tx1 = tx.clone();
+        let web_tx2 = tx.clone();
         let web_view = cascade! {
             WebView::builder().build();
                 ..load_uri(&start_page);
                 ..connect_load_changed(move |view, load_ev| {
                     if load_ev == LoadEvent::Started {
-                        let tx = web_tx.clone();
+                        let tx = web_tx1.clone();
                         let txt = WebView::uri(&view).unwrap().to_string();
                         spawn(async move {
                             let _ = tx.send(Event {
@@ -250,6 +269,17 @@ impl AppState {
                             }).await;
                         });
                     }
+                });
+                ..connect_load_failed(move |_view, _load_ev, uri, _err| {
+                    let tx = web_tx2.clone();
+                    let url = String::from(uri);
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::FailedChangePage,
+                            url
+                        }).await;
+                    });
+                    true
                 });
         };
         let web_box = cascade! {
