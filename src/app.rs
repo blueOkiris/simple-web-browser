@@ -57,33 +57,44 @@ pub fn start_browser() {
 
     // Attach tx to widgets and rx to handler
     let (tx, rx) = unbounded();
-    let mut app = AppState::new(tx);
+    let app = AppState::new(tx);
+
     let mut via_nav_btns = false;
+    let mut back_urls = vec![ app.cfg.start_page ];
+    let mut fwd_urls = Vec::new();
+
     let event_handler = async move {
         while let Ok(event) = rx.recv().await {
             match event.tp {
                 EventType::BackClicked => {
-                    if app.url_index > 0 {
-                        app.url_index -= 1;
-                        app.web_view.load_uri(
-                            app.visited_urls[app.url_index].as_str()
-                        );
-                        via_nav_btns = true;
+                    if back_urls.len() > 1 {
+                        fwd_urls.push(back_urls.pop());
 
-                        info!(
-                            "Back to {}.", app.visited_urls[app.url_index]
+                        via_nav_btns = true;
+                        app.web_view.load_uri(
+                            back_urls[back_urls.len() - 1].as_str()
+                        );
+
+                        info!("Back to {}.", back_urls[back_urls.len() - 1]);
+
+                        app.tb_buff.set_text(
+                            back_urls[back_urls.len() - 1].as_str()
                         );
                     }
                 }, EventType::ForwardClicked => {
-                    if app.url_index < app.visited_urls.len() - 1 {
-                        app.url_index += 1;
-                        app.web_view.load_uri(
-                            app.visited_urls[app.url_index].as_str()
-                        );
-                        via_nav_btns = true;
+                    if fwd_urls.len() > 0 {
+                        back_urls.push(fwd_urls[0].clone().unwrap());
+                        fwd_urls.remove(0);
 
-                        info!(
-                            "Forward to {}.", app.visited_urls[app.url_index]
+                        via_nav_btns = true;
+                        app.web_view.load_uri(
+                            back_urls[back_urls.len() - 1].as_str()
+                        );
+
+                        info!("Forward to {}.", back_urls[back_urls.len() - 1]);
+
+                        app.tb_buff.set_text(
+                            back_urls[back_urls.len() - 1].as_str()
                         );
                     }
                 }, EventType::RefreshClicked => {
@@ -92,21 +103,17 @@ pub fn start_browser() {
                     // Don't re-navigate after pressing back
                     if via_nav_btns {
                         via_nav_btns = false;
+                        continue;
                     }
 
                     info!("Changed page to {}.", event.url);
 
-                    while app.url_index < app.visited_urls.len() - 1 {
-                        info!(
-                            "Removing {} from forward queue.",
-                            app.visited_urls[app.visited_urls.len() - 1]
-                        );
-                        app.visited_urls.pop();
-                    }
-                    app.visited_urls.push(event.url.clone());
-                    app.url_index += 1;
+                    fwd_urls = Vec::new();
+                    back_urls.push(event.url.clone());
 
                     app.tb_buff.set_text(event.url.as_str());
+                }, EventType::ChangePage => {
+                    app.web_view.load_uri(&event.url);
                 }
             }
         }
@@ -120,7 +127,8 @@ enum EventType {
     BackClicked,
     ForwardClicked,
     RefreshClicked,
-    ChangedPage
+    ChangedPage,
+    ChangePage
 }
 
 struct Event {
@@ -130,9 +138,8 @@ struct Event {
 
 struct AppState {
     pub web_view: WebView,
-    pub tb_buff: TextBuffer,
-    pub url_index: usize,
-    pub visited_urls: Vec<String>
+    pub cfg: AppConfig,
+    pub tb_buff: TextBuffer
 }
 
 impl AppState {
@@ -146,6 +153,7 @@ impl AppState {
         };
         let start_page = cfg.start_page.clone();
 
+        // Create navigation bar
         let back_tx = tx.clone();
         let back_btn = cascade! {
             Button::with_label("←");
@@ -172,10 +180,33 @@ impl AppState {
                     });
                 });
         };
-        
-        let buff = TextBuffer::builder().text(&start_page).build();
-        let tb = TextView::builder().hexpand(true).buffer(&buff).build();
+        let buff_tx = tx.clone();
+        let buff = cascade! {
+            TextBuffer::builder().text(&start_page).build();
+                ..connect_changed(move |tb_buff| {
+                    let tx = buff_tx.clone();
+                    if tb_buff.line_count() > 1 {
+                        let txt = match tb_buff.text(
+                            &tb_buff.start_iter(), &tb_buff.end_iter(), true
+                        ) {
+                            None => String::new(),
+                            Some(val) => val.to_string()
+                        };
+                        
+                        let lines = txt.split("\n");
+                        let val: String = lines.collect();
+                        tb_buff.set_text(&val);
 
+                        spawn(async move {
+                            let _ = tx.send(Event {
+                                tp: EventType::ChangePage,
+                                url: val
+                            }).await;
+                        });
+                    }
+                });
+        };
+        let tb = TextView::builder().hexpand(true).buffer(&buff).build();
         let refr_tx = tx.clone();
         let refr_btn = cascade! {
             Button::with_label("↺");
@@ -190,6 +221,7 @@ impl AppState {
                 });
         };
 
+        // Create page view
         let web_tx = tx.clone();
         let web_view = cascade! {
             WebView::builder().build();
@@ -212,6 +244,7 @@ impl AppState {
                 ..pack_start(&web_view, true, true, cfg.margin);
         };
 
+        // Put it all together
         let view_cont = cascade! {
             Grid::builder().margin_top(cfg.margin as i32).build();
                 ..attach(&back_btn, 0, 0, 1, 1);
@@ -224,7 +257,6 @@ impl AppState {
                 ..pack_start(&view_cont, false, false, 0);
                 ..pack_start(&web_box, true, true, cfg.margin);
         };
-
         let _window = cascade! {
             Window::new(WindowType::Toplevel);
                 ..add(&view);
@@ -240,9 +272,8 @@ impl AppState {
 
         Self {
             web_view,
-            tb_buff: buff,
-            url_index: 0,
-            visited_urls: vec![ start_page.clone() ]
+            cfg,
+            tb_buff: buff
         }
     }
 }
