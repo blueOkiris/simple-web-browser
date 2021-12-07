@@ -5,9 +5,10 @@
 
 mod app;
 
-use app::SimpleBrowser;
+use log4rs::init_file;
+use app::start_browser;
 
 fn main() {
-    let app = SimpleBrowser::new();
-    app.run();
+    init_file("logging_config.yaml", Default::default()).unwrap();
+    start_browser();
 }

@@ -11,7 +11,7 @@ This project aims to be a simple GTK Web Browser that will support full website 
 
 Install Dependencies:
  - Rustup
- - Gtk4
+ - Gtk3
  - Webkit2Gtk
 
 `cargo build --release`
