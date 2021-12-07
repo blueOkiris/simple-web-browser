@@ -7,11 +7,12 @@ use std::future::Future;
 use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
-    Button, Box, Orientation, TextView, Grid, TextBuffer, MenuButton,
+    Button, Box, Orientation, TextView, Grid, TextBuffer,
+    Menu, MenuItem, MenuButton,
     Window, WindowType, Align,
     prelude::{
         ContainerExt, ButtonExt, BoxExt, WidgetExt, GtkWindowExt, GridExt,
-        TextBufferExt
+        TextBufferExt, MenuButtonExt, MenuShellExt, GtkMenuItemExt
     }, glib::{ set_program_name, set_application_name, MainContext }
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
@@ -228,15 +229,26 @@ impl AppState {
         let tb =
             TextView::builder().hexpand(true).accepts_tab(false)
                 .valign(Align::Center).buffer(&buff).build();
-        let bm_btn_tx = tx.clone();
+        let bm1 = cascade! {
+            Menu::builder().build();
+                ..append(&MenuItem::with_label("Bookmark 4"));
+                ..append(&MenuItem::with_label("Bookmark 5"));
+        };
+        let bm1_item = cascade! {
+            MenuItem::with_label("Bookmark 1");
+                ..set_submenu(Some(&bm1));
+        };
+        let bm_menu = cascade! {
+            Menu::builder().build();
+                ..append(&bm1_item);
+                ..append(&MenuItem::with_label("Bookmark 2"));
+                ..append(&MenuItem::with_label("Bookmark 3"));
+                ..show_all();
+        };
         let bm_btn = cascade! {
-            MenuButton::builder().label("@").border_width(cfg.margin).build();
-                ..connect_clicked(move |_| {
-                    let tx = bm_btn_tx.clone();
-                    spawn(async move {
-                        
-                    });
-                });
+            MenuButton::builder().label("@").build();
+                ..set_border_width(cfg.margin);
+                ..set_popup(Some(&bm_menu));
         };
         let refr_tx = tx.clone();
         let refr_btn = cascade! {
