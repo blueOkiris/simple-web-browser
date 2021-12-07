@@ -8,7 +8,7 @@ use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
     Button, Box, Orientation, TextView, Grid, TextBuffer,
-    Window, WindowType,
+    Window, WindowType, Align,
     prelude::{
         ContainerExt, ButtonExt, BoxExt, WidgetExt, GtkWindowExt, GridExt,
         TextBufferExt
@@ -206,7 +206,9 @@ impl AppState {
                     }
                 });
         };
-        let tb = TextView::builder().hexpand(true).buffer(&buff).build();
+        let tb =
+            TextView::builder().hexpand(true).accepts_tab(false)
+                .valign(Align::Center).buffer(&buff).build();
         let refr_tx = tx.clone();
         let refr_btn = cascade! {
             Button::with_label("↺");
@@ -246,7 +248,7 @@ impl AppState {
 
         // Put it all together
         let view_cont = cascade! {
-            Grid::builder().margin_top(cfg.margin as i32).build();
+            Grid::builder().build();
                 ..attach(&back_btn, 0, 0, 1, 1);
                 ..attach(&fwd_btn, 1, 0, 1, 1);
                 ..attach(&tb, 2, 0, 5, 1);
@@ -255,7 +257,7 @@ impl AppState {
         let view = cascade! {
             Box::new(Orientation::Vertical, 0);
                 ..pack_start(&view_cont, false, false, 0);
-                ..pack_start(&web_box, true, true, cfg.margin);
+                ..pack_end(&web_box, true, true, cfg.margin);
         };
         let _window = cascade! {
             Window::new(WindowType::Toplevel);
