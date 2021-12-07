@@ -1,0 +1,3 @@
+swb/.stack-work/*
+*.lock
+*.cabal
