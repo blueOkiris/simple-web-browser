@@ -18,9 +18,12 @@ use gtk::{
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
 use serde::{ Serialize, Deserialize };
-use log::{ warn, error, info, debug };
+use log::{ warn, error, info };
 use confy::{ load, store };
 use cascade::cascade;
+use tokio::runtime::Runtime;
+
+use crate::db::query_salt;
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
@@ -57,14 +60,14 @@ pub fn start_browser() {
     let event_handler = async move {
         while let Ok(event) = rx.recv().await {
 
-            debug!("Back urls:");
+            /*debug!("Back urls:");
             for url in back_urls.clone() {
                 debug!("Back: {}.", url);
             }
             debug!("Forward urls:");
             for url in fwd_urls.clone() {
                 debug!("Forward: {}.", url);
-            }
+            }*/
 
             match event.tp {
                 EventType::BackClicked => {
@@ -145,6 +148,7 @@ pub fn start_browser() {
                         ..set_default_size(POPUP_WIDTH, POPUP_HEIGHT);
                         ..set_modal(true);
                         ..set_resizable(false);
+                        ..add_button("Register", ResponseType::Apply);
                         ..add_button("Login", ResponseType::Accept);
                         ..add_button("Cancel", ResponseType::Cancel);
                     };
@@ -191,10 +195,54 @@ pub fn start_browser() {
                     content_area.pack_start(&remem, true, true, app.cfg.margin);
                     
                     dialog.connect_response(move |view, resp| {
+                        let username = pword_buff.text().clone();
+                        let password = pword_buff.text().clone();
                         match resp {
                             ResponseType::Cancel => view.hide(),
-                            ResponseType::Accept => {
-                                
+                            ResponseType::Accept => { // Login
+                                info!("Attempting to login to sync.");
+
+                                let rt = Runtime::new().unwrap();
+                                let salt_fut = query_salt(&username);
+                                let salt_res = rt.block_on(salt_fut);
+
+                                match salt_res {
+                                    Err(err) => {
+                                        error!(
+                                            "Error logging in {}.",
+                                            err
+                                        );
+
+                                        let err_dialog = cascade! {
+                                            Dialog::new();
+                                                ..set_title("Error!");
+                                                ..add_button(
+                                                    "Okay",
+                                                    ResponseType::Cancel
+                                                );..connect_response(
+                                                    move |view, _| {
+                                                        view.hide();
+                                                    }
+                                                );..set_modal(true);
+                                        };
+                                        let _con = cascade! {
+                                            err_dialog.content_area();
+                                                ..pack_start(
+                                                    &Label::new(Some(
+                                                        format!("{}", err)
+                                                            .as_str()
+                                                    )), true, true,
+                                                    0
+                                                );
+                                        };
+                                        err_dialog.show_all();
+                                        return;
+                                    }, Ok(salt) => {
+                                        
+                                    }
+                                }
+                            }, ResponseType::Apply => { // Register
+                                // Check to see if a user exists
                             }, _ => view.hide()
                         }
                     });
