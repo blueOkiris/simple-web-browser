@@ -277,7 +277,7 @@ impl AppState {
                     let item_tx = tx.clone();
                     let item = cascade! {
                         MenuItem::with_label(name.as_str());
-                            ..connect_activate(move |_view| {
+                            ..connect_activate(move |_| {
                                 let tx = item_tx.clone();
                                 let url = bm_url.clone();
                                 spawn(async move {
@@ -308,7 +308,7 @@ impl AppState {
                         let item_tx = tx.clone();
                         let item = cascade! {
                             MenuItem::with_label(name.as_str());
-                                ..connect_activate(move |_view| {
+                                ..connect_activate(move |_| {
                                     let tx = item_tx.clone();
                                     let url = bm_url.clone();
                                     spawn(async move {
@@ -370,7 +370,7 @@ impl AppState {
                         });
                     }
                 });
-                ..connect_load_failed(move |_view, _load_ev, uri, _err| {
+                ..connect_load_failed(move |_, _, uri, _| {
                     let tx = web_tx2.clone();
                     let url = String::from(uri);
                     spawn(async move {
