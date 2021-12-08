@@ -1,6 +1,6 @@
 /*
  * Author: Dylan Turner
- * Description: Defines application state
+ * Description: Define application state and create gui
  */
 
 use std::future::Future;
@@ -18,7 +18,7 @@ use gtk::{
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
 use serde::{ Serialize, Deserialize };
-use log::{ warn, error, info };
+use log::{ warn, error, info, debug };
 use confy::{ load, store };
 use cascade::cascade;
 use home::home_dir;
@@ -27,7 +27,7 @@ const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
 const WIN_DEF_HEIGHT: i32 = 480;
 const POPUP_WIDTH: i32 = 300;
-const POPUP_HEIGHT: i32 = 100;
+const POPUP_HEIGHT: i32 = 200;
 const APP_NAME: &'static str = "swb";
 
 // Spawns a task on default executor, without waiting to complete
@@ -51,71 +51,85 @@ pub fn start_browser() {
 
     let mut via_nav_btns = false;
     let mut back_urls = vec![ app.cfg.start_page ];
-    let mut fwd_urls = Vec::new();
+    let mut fwd_urls: Vec<String> = Vec::new();
 
     let mut err_url = String::new();
 
     let event_handler = async move {
         while let Ok(event) = rx.recv().await {
+
+            debug!("Back urls:");
+            for url in back_urls.clone() {
+                debug!("Back: {}.", url);
+            }
+            debug!("Forward urls:");
+            for url in fwd_urls.clone() {
+                debug!("Forward: {}.", url);
+            }
+
             match event.tp {
                 EventType::BackClicked => {
-                    if back_urls.len() > 1 {
-                        fwd_urls.push(back_urls.pop());
+                    if back_urls.len() > 0 {
+                        let new_url = back_urls.pop().unwrap();
+                        fwd_urls.insert(0, new_url.clone());
 
                         via_nav_btns = true;
-                        app.web_view.load_uri(
-                            back_urls[back_urls.len() - 1].as_str()
-                        );
+                        app.web_view.load_uri(&new_url);
 
-                        info!("Back to {}.", back_urls[back_urls.len() - 1]);
+                        info!("Back to {}.", new_url);
 
-                        app.tb_buff.set_text(
-                            back_urls[back_urls.len() - 1].as_str()
-                        );
+                        app.tb_buff.set_text(new_url.as_str());
                     }
                 }, EventType::ForwardClicked => {
                     if fwd_urls.len() > 0 {
-                        back_urls.push(fwd_urls[0].clone().unwrap());
-                        fwd_urls.remove(0);
+                        let new_url = fwd_urls.pop().unwrap();
+                        back_urls.push(new_url.clone());
 
                         via_nav_btns = true;
-                        app.web_view.load_uri(
-                            back_urls[back_urls.len() - 1].as_str()
-                        );
+                        app.web_view.load_uri(&new_url);
 
-                        info!("Forward to {}.", back_urls[back_urls.len() - 1]);
+                        info!("Forward to {}.", new_url);
 
-                        app.tb_buff.set_text(
-                            back_urls[back_urls.len() - 1].as_str()
-                        );
+                        app.tb_buff.set_text(new_url.as_str());
                     }
                 }, EventType::RefreshClicked => {
                     via_nav_btns = true;
                     app.web_view.reload();
                 }, EventType::ChangedPage => {
+                    info!("Changed page to {}.", event.url);
+
                     // Don't re-navigate after pressing back
                     if via_nav_btns {
                         via_nav_btns = false;
                         continue;
                     }
 
-                    info!("Changed page to {}.", event.url);
-
                     fwd_urls = Vec::new();
-                    back_urls.push(event.url.clone());
+                    fwd_urls.push(event.url.clone());
 
                     app.tb_buff.set_text(event.url.as_str());
                 }, EventType::ChangePage => {
                     app.web_view.load_uri(&event.url);
                 }, EventType::FailedChangePage => {
-                    info!("Failed to change page to {}.", event.url);
-                    
+                    warn!("Failed to change page to {}.", event.url);
+
+                    match back_urls.clone().iter().position(
+                                |e| *e == event.url
+                            ) {
+                        None => {},
+                        Some(pos) => { back_urls.remove(pos); }
+                    }
+                    match fwd_urls.clone().iter().position(
+                                |e| *e == event.url
+                            ) {
+                        None => {},
+                        Some(pos) => { fwd_urls.remove(pos); }
+                    }
+
                     if event.url == err_url {
-                        let home_dir =
-                            home_dir().unwrap().display().to_string();
-                        app.web_view.load_uri(
-                            (String::from("file://") + &home_dir).as_str()
-                        );
+                        warn!("Site unreachable. Loading error page.");
+                        app.tb_buff.set_text("about:blank");
+                        app.web_view.load_uri("about:blank");
                     } else {
                         err_url =
                             app.cfg.search_engine.replace("${}", &event.url);
@@ -429,16 +443,19 @@ impl AppState {
                         });
                     }
                 });
-                ..connect_load_failed(move |_, _, uri, _| {
-                    let tx = web_tx2.clone();
-                    let url = String::from(uri);
-                    spawn(async move {
-                        let _ = tx.send(Event {
-                            tp: EventType::FailedChangePage,
-                            url
-                        }).await;
-                    });
-                    true
+                ..connect_load_failed(move |_, load_ev, uri, _| {
+                    if load_ev == LoadEvent::Started {
+                        let tx = web_tx2.clone();
+                        let url = String::from(uri);
+                        spawn(async move {
+                            let _ = tx.send(Event {
+                                tp: EventType::FailedChangePage,
+                                url
+                            }).await;
+                        });
+                        return true;
+                    }
+                    false
                 });
         };
         let web_box = cascade! {
