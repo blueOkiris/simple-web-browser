@@ -7,12 +7,13 @@ use std::future::Future;
 use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
-    Button, Box, Orientation, TextView, Grid, TextBuffer,
+    Button, Box, Orientation, TextView, Grid, TextBuffer, Label,
     Menu, MenuItem, MenuButton,
-    Window, WindowType, Align,
+    Window, WindowType, Align, Dialog, DialogFlags, ResponseType,
     prelude::{
         ContainerExt, ButtonExt, BoxExt, WidgetExt, GtkWindowExt, GridExt,
-        TextBufferExt, MenuButtonExt, MenuShellExt, GtkMenuItemExt
+        TextBufferExt, MenuButtonExt, MenuShellExt, GtkMenuItemExt,
+        DialogExt
     }, glib::{ set_program_name, set_application_name, MainContext }
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
@@ -116,6 +117,37 @@ pub fn start_browser() {
                             app.cfg.search_engine.replace("${}", &event.url);
                         app.web_view.load_uri(err_url.as_str());
                     }
+                }, EventType::LoginRegister => {
+                    /* Create a login prompt */
+                    let dialog = cascade! {
+                        Dialog::with_buttons(
+                            Some("Sign In"), Some(&app.win),
+                            DialogFlags::from_bits(1).unwrap(),
+                            &[ ("_OK", ResponseType::Accept) ]
+                        );
+                        ..connect_response(move |view, _| {
+                            view.hide();
+                        });
+                    };
+                    let content_area = dialog.content_area();
+
+                    let uname_buff = TextBuffer::builder().build();
+                    let uname = cascade! {
+                        Box::new(Orientation::Horizontal, 0);
+                            ..pack_start(
+                                &Label::new(Some("Username: ")),
+                                false, false, app.cfg.margin
+                            );..pack_start(
+                                &TextView::builder()
+                                    .hexpand(true).buffer(&uname_buff).build(),
+                                true, true, app.cfg.margin
+                            );
+                            ..set_expand(true);
+                    };
+                    
+                    // TODO: Finish
+
+                    dialog.show_all();
                 }
             }
         }
@@ -156,7 +188,8 @@ enum EventType {
     RefreshClicked,
     ChangedPage,
     ChangePage,
-    FailedChangePage
+    FailedChangePage,
+    LoginRegister
 }
 
 struct Event {
@@ -165,6 +198,7 @@ struct Event {
 }
 
 struct AppState {
+    pub win: Window,
     pub web_view: WebView,
     pub cfg: AppConfig,
     pub tb_buff: TextBuffer
@@ -404,7 +438,13 @@ impl AppState {
                 Button::with_label("↨");
                     ..set_border_width(cfg.margin);
                     ..connect_clicked(move |_| {
-                        
+                        let tx = sync_tx.clone();
+                        spawn(async move {
+                            let _ = tx.send(Event {
+                                tp: EventType::LoginRegister,
+                                url: String::new()
+                            }).await;
+                        });
                     });
             };
             view_cont.attach(&sync_btn, 9, 0, 1, 1);
@@ -415,7 +455,7 @@ impl AppState {
                 ..pack_start(&view_cont, false, false, 0);
                 ..pack_end(&web_box, true, true, cfg.margin);
         };
-        let _window = cascade! {
+        let win = cascade! {
             Window::new(WindowType::Toplevel);
                 ..add(&view);
                 ..set_title(WIN_TITLE);
@@ -429,6 +469,7 @@ impl AppState {
         //gtk::Window::set_default_icon_name("icon-name-here");
 
         Self {
+            win,
             web_view,
             cfg,
             tb_buff: buff
