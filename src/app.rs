@@ -7,13 +7,13 @@ use std::future::Future;
 use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
-    Button, Box, Orientation, TextView, Grid, TextBuffer, Label,
+    Button, Box, Orientation, Entry, EntryBuffer, Grid, Label, CheckButton,
     Menu, MenuItem, MenuButton,
     Window, WindowType, Align, Dialog, DialogFlags, ResponseType,
     prelude::{
         ContainerExt, ButtonExt, BoxExt, WidgetExt, GtkWindowExt, GridExt,
-        TextBufferExt, MenuButtonExt, MenuShellExt, GtkMenuItemExt,
-        DialogExt
+        MenuButtonExt, MenuShellExt, GtkMenuItemExt,
+        DialogExt, EntryExt
     }, glib::{ set_program_name, set_application_name, MainContext }
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
@@ -25,7 +25,9 @@ use home::home_dir;
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
-const WIND_DEF_HEIGHT: i32 = 480;
+const WIN_DEF_HEIGHT: i32 = 480;
+const POPUP_WIDTH: i32 = 300;
+const POPUP_HEIGHT: i32 = 100;
 const APP_NAME: &'static str = "swb";
 
 // Spawns a task on default executor, without waiting to complete
@@ -106,6 +108,8 @@ pub fn start_browser() {
                 }, EventType::ChangePage => {
                     app.web_view.load_uri(&event.url);
                 }, EventType::FailedChangePage => {
+                    info!("Failed to change page to {}.", event.url);
+                    
                     if event.url == err_url {
                         let home_dir =
                             home_dir().unwrap().display().to_string();
@@ -123,30 +127,64 @@ pub fn start_browser() {
                         Dialog::with_buttons(
                             Some("Sign In"), Some(&app.win),
                             DialogFlags::from_bits(1).unwrap(),
-                            &[ ("_OK", ResponseType::Accept) ]
+                            &[ ]
                         );
-                        ..connect_response(move |view, _| {
-                            view.hide();
-                        });
+                        ..set_default_size(POPUP_WIDTH, POPUP_HEIGHT);
+                        ..set_modal(true);
+                        ..set_resizable(false);
+                        ..add_button("Login", ResponseType::Accept);
+                        ..add_button("Cancel", ResponseType::Cancel);
                     };
                     let content_area = dialog.content_area();
 
-                    let uname_buff = TextBuffer::builder().build();
+                    let uname_buff = EntryBuffer::new(Some(""));
                     let uname = cascade! {
                         Box::new(Orientation::Horizontal, 0);
                             ..pack_start(
                                 &Label::new(Some("Username: ")),
                                 false, false, app.cfg.margin
                             );..pack_start(
-                                &TextView::builder()
-                                    .hexpand(true).buffer(&uname_buff).build(),
+                                &Entry::builder()
+                                    .buffer(&uname_buff).hexpand(true)
+                                    .build(),
                                 true, true, app.cfg.margin
                             );
-                            ..set_expand(true);
                     };
-                    
-                    // TODO: Finish
+                    content_area.pack_start(&uname, true, true, 0);
 
+                    let pword_buff = EntryBuffer::new(Some(""));
+                    let pword = cascade! {
+                        Box::new(Orientation::Horizontal, 0);
+                            ..pack_start(
+                                &Label::new(Some("Password: ")),
+                                false, false, app.cfg.margin
+                            );..pack_start(
+                                &Entry::builder()
+                                    .buffer(&pword_buff).hexpand(true)
+                                    .visibility(false)
+                                    .build(),
+                                true, true, app.cfg.margin
+                            );
+                    };
+                    content_area.pack_start(&pword, true, true, 0);
+                    
+                    let remem = cascade! {
+                        Box::new(Orientation::Horizontal, 0);
+                            ..pack_start(
+                                &CheckButton::with_label("Remember"),
+                                true, true, 0
+                            );
+                    };
+                    content_area.pack_start(&remem, true, true, 0);
+                    
+                    dialog.connect_response(move |view, resp| {
+                        match resp {
+                            ResponseType::Cancel => view.hide(),
+                            ResponseType::Accept => {
+                                
+                            }, _ => view.hide()
+                        }
+                    });
                     dialog.show_all();
                 }
             }
@@ -201,7 +239,7 @@ struct AppState {
     pub win: Window,
     pub web_view: WebView,
     pub cfg: AppConfig,
-    pub tb_buff: TextBuffer
+    pub tb_buff: EntryBuffer
 }
 
 impl AppState {
@@ -266,34 +304,21 @@ impl AppState {
 
         // Search/Navigation text box
         let buff_tx = tx.clone();
-        let buff = cascade! {
-            TextBuffer::builder().text(&start_page).build();
-                ..connect_changed(move |tb_buff| {
+        let buff = EntryBuffer::new(Some(&start_page.as_str()));
+        let tb = cascade! {
+            Entry::builder().hexpand(true)
+                .valign(Align::Center).buffer(&buff).build();
+                ..connect_activate(move |entry| {
                     let tx = buff_tx.clone();
-                    if tb_buff.line_count() > 1 {
-                        let txt = match tb_buff.text(
-                            &tb_buff.start_iter(), &tb_buff.end_iter(), true
-                        ) {
-                            None => String::new(),
-                            Some(val) => val.to_string()
-                        };
-                        
-                        let lines = txt.split("\n");
-                        let val: String = lines.collect();
-                        tb_buff.set_text(&val);
-
-                        spawn(async move {
-                            let _ = tx.send(Event {
-                                tp: EventType::ChangePage,
-                                url: val
-                            }).await;
-                        });
-                    }
+                    let url = entry.text().to_string().clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::ChangePage,
+                            url
+                        }).await;
+                    });
                 });
         };
-        let tb =
-            TextView::builder().hexpand(true).accepts_tab(false)
-                .valign(Align::Center).buffer(&buff).build();
 
         // Generate book marks menu
         let bookmark_menu = Menu::builder().build();
@@ -459,7 +484,7 @@ impl AppState {
             Window::new(WindowType::Toplevel);
                 ..add(&view);
                 ..set_title(WIN_TITLE);
-                ..set_default_size(WIN_DEF_WIDTH, WIND_DEF_HEIGHT);
+                ..set_default_size(WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
                 ..connect_delete_event(move |_, _| {
                     main_quit();
                     Inhibit(false)
