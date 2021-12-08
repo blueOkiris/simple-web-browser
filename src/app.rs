@@ -163,7 +163,7 @@ pub fn start_browser() {
                                 true, true, app.cfg.margin
                             );
                     };
-                    content_area.pack_start(&uname, true, true, 0);
+                    content_area.pack_start(&uname, true, true, app.cfg.margin);
 
                     let pword_buff = EntryBuffer::new(Some(""));
                     let pword = cascade! {
@@ -179,16 +179,16 @@ pub fn start_browser() {
                                 true, true, app.cfg.margin
                             );
                     };
-                    content_area.pack_start(&pword, true, true, 0);
+                    content_area.pack_start(&pword, true, true, app.cfg.margin);
                     
                     let remem = cascade! {
                         Box::new(Orientation::Horizontal, 0);
                             ..pack_start(
                                 &CheckButton::with_label("Remember"),
-                                true, true, 0
+                                true, true, app.cfg.margin
                             );
                     };
-                    content_area.pack_start(&remem, true, true, 0);
+                    content_area.pack_start(&remem, true, true, app.cfg.margin);
                     
                     dialog.connect_response(move |view, resp| {
                         match resp {
