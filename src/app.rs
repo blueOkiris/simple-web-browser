@@ -21,7 +21,6 @@ use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info, debug };
 use confy::{ load, store };
 use cascade::cascade;
-use home::home_dir;
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
