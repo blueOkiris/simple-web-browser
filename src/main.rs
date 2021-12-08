@@ -4,6 +4,7 @@
  */
 
 mod app;
+mod db;
 
 use log4rs::init_file;
 use app::start_browser;

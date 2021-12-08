@@ -18,7 +18,7 @@ use gtk::{
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
 use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info };
-use confy::load;
+use confy::{ load, store };
 use cascade::cascade;
 use home::home_dir;
 
@@ -26,23 +26,6 @@ const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
 const WIND_DEF_HEIGHT: i32 = 480;
 const APP_NAME: &'static str = "swb";
-
-#[derive(Serialize, Deserialize)]
-struct AppConfig {
-    pub start_page: String,
-    pub search_engine: String,
-    pub margin: u32
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            start_page: String::from("https://duckduckgo.org"),
-            search_engine: String::from("https://duckduckgo.com/?q=${}"),
-            margin: 10
-        }
-    }
-}
 
 // Spawns a task on default executor, without waiting to complete
 fn spawn<F>(future: F) where F: Future<Output = ()> + 'static {
@@ -142,6 +125,31 @@ pub fn start_browser() {
     main();
 }
 
+#[derive(Serialize, Deserialize)]
+struct AppConfig {
+    pub start_page: String,
+    pub search_engine: String,
+    pub local: bool,
+    pub bookmarks: Vec<Vec<Vec<String>>>,
+    pub username: String,
+    pub pass_enc: String,
+    pub margin: u32
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            start_page: String::from("https://duckduckgo.org"),
+            search_engine: String::from("https://duckduckgo.com/?q=${}"),
+            local: false,
+            bookmarks: Vec::new(),
+            username: String::new(),
+            pass_enc: String::new(),
+            margin: 10
+        }
+    }
+}
+
 enum EventType {
     BackClicked,
     ForwardClicked,
@@ -164,6 +172,23 @@ struct AppState {
 
 impl AppState {
     pub fn new(tx: Sender<Event>) -> Self {
+        // Try to sync bookmarks online
+        let mut temp_cfg = match load(APP_NAME) {
+            Err(_) => {
+                warn!("Error in config! Using defaults.");
+                AppConfig::default()
+            }, Ok(config) => config
+        };
+        if !temp_cfg.local {
+            // Sync via db
+            let synced_bm = Vec::new();
+
+            if false {
+                temp_cfg.bookmarks = synced_bm.clone();
+                store(APP_NAME, temp_cfg).unwrap();
+            }
+        }
+
         // Load config file
         let cfg = match load(APP_NAME) {
             Err(_) => {
@@ -173,7 +198,9 @@ impl AppState {
         };
         let start_page = cfg.start_page.clone();
 
-        // Create navigation bar
+        /* Create navigation bar */
+
+        // Back button
         let back_tx = tx.clone();
         let back_btn = cascade! {
             Button::with_label("←");
@@ -187,6 +214,8 @@ impl AppState {
                     });
                 });
         };
+
+        // Forward button
         let fwd_tx = tx.clone();
         let fwd_btn = cascade! {
             Button::with_label("→");
@@ -200,6 +229,8 @@ impl AppState {
                     });
                 });
         };
+
+        // Search/Navigation text box
         let buff_tx = tx.clone();
         let buff = cascade! {
             TextBuffer::builder().text(&start_page).build();
@@ -229,27 +260,84 @@ impl AppState {
         let tb =
             TextView::builder().hexpand(true).accepts_tab(false)
                 .valign(Align::Center).buffer(&buff).build();
-        let bm1 = cascade! {
-            Menu::builder().build();
-                ..append(&MenuItem::with_label("Bookmark 4"));
-                ..append(&MenuItem::with_label("Bookmark 5"));
-        };
-        let bm1_item = cascade! {
-            MenuItem::with_label("Bookmark 1");
-                ..set_submenu(Some(&bm1));
-        };
-        let bm_menu = cascade! {
-            Menu::builder().build();
-                ..append(&bm1_item);
-                ..append(&MenuItem::with_label("Bookmark 2"));
-                ..append(&MenuItem::with_label("Bookmark 3"));
-                ..show_all();
-        };
+
+        // Generate book marks menu
+        let bookmark_menu = Menu::builder().build();
+        for folder in cfg.bookmarks.clone() {
+            match folder.len() {
+                0 => { },
+                1 => {
+                    // Lots of clones bc closure expects static. Wouldn't touch
+                    let bm = folder[0].clone();
+                    let name = bm[0].clone();
+                    let bm_url = bm[0].clone();
+
+                    info!("Found local bookmark: {} -> '{}'.", name, bm_url);
+
+                    let item_tx = tx.clone();
+                    let item = cascade! {
+                        MenuItem::with_label(name.as_str());
+                            ..connect_activate(move |_view| {
+                                let tx = item_tx.clone();
+                                let url = bm_url.clone();
+                                spawn(async move {
+                                    let _ = tx.send(Event {
+                                        tp: EventType::ChangePage,
+                                        url
+                                    }).await;
+                                });
+                            });
+                    };
+                    bookmark_menu.append(&item);
+                }, _ => {
+                    let fldr_name = folder[0][0].clone();
+                    let sub_menu = Menu::builder().build();
+
+                    for i in 1..folder.len() {
+                        let fldr_clone = folder.clone();
+                        let bookmark = fldr_clone[i].clone();
+
+                        let name = bookmark[0].clone();
+                        let bm_url = bookmark[1].clone();
+
+                        info!(
+                            "Found local bookmark: {}/{} -> '{}'.",
+                            fldr_name, name, bm_url
+                        );
+
+                        let item_tx = tx.clone();
+                        let item = cascade! {
+                            MenuItem::with_label(name.as_str());
+                                ..connect_activate(move |_view| {
+                                    let tx = item_tx.clone();
+                                    let url = bm_url.clone();
+                                    spawn(async move {
+                                        let _ = tx.send(Event {
+                                            tp: EventType::ChangePage,
+                                            url
+                                        }).await;
+                                    });
+                                });
+                        };
+                        sub_menu.append(&item);
+                    }
+
+                    sub_menu.show_all();
+                    let item = cascade! {
+                        MenuItem::with_label(fldr_name.as_str());
+                            ..set_submenu(Some(&sub_menu));
+                    };
+                    bookmark_menu.append(&item);
+                }
+            }
+        }
+        bookmark_menu.show_all();
         let bm_btn = cascade! {
             MenuButton::builder().label("@").build();
                 ..set_border_width(cfg.margin);
-                ..set_popup(Some(&bm_menu));
+                ..set_popup(Some(&bookmark_menu));
         };
+
         let refr_tx = tx.clone();
         let refr_btn = cascade! {
             Button::with_label("↺");
@@ -264,7 +352,7 @@ impl AppState {
                 });
         };
 
-        // Create page view
+        /* Create page view */
         let web_tx1 = tx.clone();
         let web_tx2 = tx.clone();
         let web_view = cascade! {
@@ -299,7 +387,7 @@ impl AppState {
                 ..pack_start(&web_view, true, true, cfg.margin);
         };
 
-        // Put it all together
+        /* Put it all together */
         let view_cont = cascade! {
             Grid::builder().build();
                 ..attach(&back_btn, 0, 0, 1, 1);
@@ -308,6 +396,20 @@ impl AppState {
                 ..attach(&bm_btn, 7, 0, 1, 1);
                 ..attach(&refr_btn, 8, 0, 1, 1);
         };
+
+        // Sync popup button
+        if cfg.local {
+            let sync_tx = tx.clone();
+            let sync_btn = cascade! {
+                Button::with_label("↨");
+                    ..set_border_width(cfg.margin);
+                    ..connect_clicked(move |_| {
+                        
+                    });
+            };
+            view_cont.attach(&sync_btn, 9, 0, 1, 1);
+        }
+
         let view = cascade! {
             Box::new(Orientation::Vertical, 0);
                 ..pack_start(&view_cont, false, false, 0);
