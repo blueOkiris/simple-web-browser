@@ -11,7 +11,7 @@ use serde::{ Serialize, Deserialize };
 use std::error::Error;
 use log::info;
 
-const DB_URL: &'static str = "mongodb://192.168.1.10:27017";
+const DB_URL: &'static str = "mongodb://blueokiris.com:27017";
 
 /*
  * Users exist as the following structure:
