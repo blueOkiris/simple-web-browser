@@ -7,9 +7,9 @@ use std::future::Future;
 use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
-    Button, Box, Orientation, Entry, EntryBuffer, Grid, Label, CheckButton,
+    Button, Box, Orientation, Entry, EntryBuffer, Grid,
     Menu, MenuItem, MenuButton,
-    Window, WindowType, Align, Dialog, DialogFlags, ResponseType,
+    Window, WindowType, Align, ResponseType,
     prelude::{
         ContainerExt, ButtonExt, BoxExt, WidgetExt, GtkWindowExt, GridExt,
         MenuButtonExt, MenuShellExt, GtkMenuItemExt,
@@ -21,20 +21,154 @@ use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info };
 use confy::{ load, store };
 use cascade::cascade;
-use tokio::runtime::Runtime;
 
+use crate::gui::{ create_error_popup, create_login_dialog };
 use crate::db::query_salt;
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
 const WIN_DEF_HEIGHT: i32 = 480;
-const POPUP_WIDTH: i32 = 300;
-const POPUP_HEIGHT: i32 = 200;
 const APP_NAME: &'static str = "swb";
 
 // Spawns a task on default executor, without waiting to complete
 fn spawn<F>(future: F) where F: Future<Output = ()> + 'static {
     MainContext::default().spawn_local(future);
+}
+    
+pub fn start_browser() {
+    set_program_name(APP_NAME.into());
+    set_application_name(APP_NAME);
+
+    // Initialize gtk
+    if init().is_err() {
+        error!("Failed to initialize GTK Application!");
+        panic!("Failed to initialize GTK Application!");
+    }
+
+    // Attach tx to widgets and rx to handler
+    let (tx, rx) = unbounded();
+    let app = AppState::new(tx);
+
+    // Store some state so the application can go back and forth
+    let mut via_nav_btns = false;
+    let mut back_urls = vec![ app.cfg.start_page ];
+    let mut fwd_urls: Vec<String> = Vec::new();
+
+    // We try to search first, but we store it so if we fail again actually fail
+    let mut err_url = String::new();
+
+    let event_handler = async move {
+        while let Ok(event) = rx.recv().await {
+
+            /*debug!("Back urls:");
+            for url in back_urls.clone() {
+                debug!("Back: {}.", url);
+            }
+            debug!("Forward urls:");
+            for url in fwd_urls.clone() {
+                debug!("Forward: {}.", url);
+            }*/
+
+            match event.tp {
+                EventType::BackClicked => {
+                    if back_urls.len() > 0 {
+                        let new_url = back_urls.pop().unwrap();
+                        fwd_urls.insert(0, new_url.clone());
+
+                        via_nav_btns = true;
+                        app.web_view.load_uri(&new_url);
+
+                        info!("Back to {}.", new_url);
+
+                        app.tb_buff.set_text(new_url.as_str());
+                    }
+                }, EventType::ForwardClicked => {
+                    if fwd_urls.len() > 0 {
+                        let new_url = fwd_urls.pop().unwrap();
+                        back_urls.push(new_url.clone());
+
+                        via_nav_btns = true;
+                        app.web_view.load_uri(&new_url);
+
+                        info!("Forward to {}.", new_url);
+
+                        app.tb_buff.set_text(new_url.as_str());
+                    }
+                }, EventType::RefreshClicked => {
+                    via_nav_btns = true;
+                    app.web_view.reload();
+                }, EventType::ChangedPage => {
+                    info!("Changed page to {}.", event.url);
+
+                    // Don't re-navigate after pressing back
+                    if via_nav_btns {
+                        via_nav_btns = false;
+                        continue;
+                    }
+
+                    fwd_urls = Vec::new();
+                    fwd_urls.push(event.url.clone());
+
+                    app.tb_buff.set_text(event.url.as_str());
+                }, EventType::ChangePage => {
+                    app.web_view.load_uri(&event.url);
+                }, EventType::FailedChangePage => {
+                    warn!("Failed to change page to {}.", event.url);
+
+                    match back_urls.clone().iter().position(
+                                |e| *e == event.url
+                            ) {
+                        None => {},
+                        Some(pos) => { back_urls.remove(pos); }
+                    }
+                    match fwd_urls.clone().iter().position(
+                                |e| *e == event.url
+                            ) {
+                        None => {},
+                        Some(pos) => { fwd_urls.remove(pos); }
+                    }
+
+                    if event.url == err_url {
+                        warn!("Site unreachable. Loading error page.");
+                        app.tb_buff.set_text("about:blank");
+                        app.web_view.load_uri("about:blank");
+                    } else {
+                        err_url =
+                            app.cfg.search_engine.replace("${}", &event.url);
+                        app.web_view.load_uri(err_url.as_str());
+                    }
+                }, EventType::LoginRegister => {
+                    /* Create a login prompt */
+                    let login = create_login_dialog(app.cfg.margin, &app.win);
+                    login.dialog.connect_response(move |view, resp| {
+                        let username = login.uname_buff.text().clone();
+                        let password = login.pword_buff.text().clone();
+                        match resp {
+                            ResponseType::Cancel => view.hide(),
+                            ResponseType::Accept => { // Login
+                                info!("Attempting to login to sync.");
+
+                                let salt_res = query_salt(&username);
+
+                                match salt_res {
+                                    Err(err) => create_error_popup(&err),
+                                    Ok(salt) => {
+                                        
+                                    }
+                                }
+                            }, ResponseType::Apply => { // Register
+                                
+                            }, _ => view.hide()
+                        }
+                    });
+                    login.dialog.show_all();
+                }
+            }
+        }
+    };
+    MainContext::default().spawn_local(event_handler);
+
+    main();
 }
 
 #[derive(Serialize, Deserialize)]
@@ -86,81 +220,54 @@ struct AppState {
 
 impl AppState {
     pub fn new(tx: Sender<Event>) -> Self {
-        // Try to sync bookmarks online
-        let mut temp_cfg = match load(APP_NAME) {
-            Err(_) => {
-                warn!("Error in config! Using defaults.");
-                AppConfig::default()
-            }, Ok(config) => config
-        };
-        if !temp_cfg.local {
-            // Sync via db
-            let synced_bm = Vec::new();
+        AppState::try_sync_bookmarks();
 
-            if false {
-                temp_cfg.bookmarks = synced_bm.clone();
-                store(APP_NAME, temp_cfg).unwrap();
-            }
-        }
-
-        // Load config file
-        let cfg = match load(APP_NAME) {
-            Err(_) => {
-                warn!("Error in config! Using defaults.");
-                AppConfig::default()
-            }, Ok(config) => config
-        };
+        let cfg = AppState::load_config();
         let start_page = cfg.start_page.clone();
 
         /* Create navigation bar */
 
         // Back button
+        let back_btn = Button::with_label("←");
+        back_btn.set_border_width(cfg.margin);
         let back_tx = tx.clone();
-        let back_btn = cascade! {
-            Button::with_label("←");
-                ..set_border_width(cfg.margin);
-                ..connect_clicked(move |_| {
-                    let tx = back_tx.clone();
-                    spawn(async move {
-                        let _ = tx.send(Event {
-                            tp: EventType::BackClicked, url: String::new()
-                        }).await;
-                    });
-                });
-        };
+        back_btn.connect_clicked(move |_| {
+            let tx = back_tx.clone();
+            spawn(async move {
+                let _ = tx.send(Event {
+                    tp: EventType::BackClicked, url: String::new()
+                }).await;
+            });
+        });
 
         // Forward button
+        let fwd_btn = Button::with_label("→");
+        fwd_btn.set_border_width(cfg.margin);
         let fwd_tx = tx.clone();
-        let fwd_btn = cascade! {
-            Button::with_label("→");
-                ..set_border_width(cfg.margin);
-                ..connect_clicked(move |_| {
-                    let tx = fwd_tx.clone();
-                    spawn(async move {
-                        let _ = tx.send(Event {
-                            tp: EventType::ForwardClicked, url: String::new()
-                        }).await;
-                    });
-                });
-        };
+        fwd_btn.connect_clicked(move |_| {
+            let tx = fwd_tx.clone();
+            spawn(async move {
+                let _ = tx.send(Event {
+                    tp: EventType::ForwardClicked, url: String::new()
+                }).await;
+            });
+        });
 
         // Search/Navigation text box
-        let buff_tx = tx.clone();
         let buff = EntryBuffer::new(Some(&start_page.as_str()));
-        let tb = cascade! {
-            Entry::builder().hexpand(true)
-                .valign(Align::Center).buffer(&buff).build();
-                ..connect_activate(move |entry| {
-                    let tx = buff_tx.clone();
-                    let url = entry.text().to_string().clone();
-                    spawn(async move {
-                        let _ = tx.send(Event {
-                            tp: EventType::ChangePage,
-                            url
-                        }).await;
-                    });
-                });
-        };
+        let tb = Entry::builder()
+            .hexpand(true).valign(Align::Center).buffer(&buff).build();
+        let tb_tx = tx.clone();
+        tb.connect_activate(move |entry| {
+            let tx = tb_tx.clone();
+            let url = entry.text().to_string().clone();
+            spawn(async move {
+                let _ = tx.send(Event {
+                    tp: EventType::ChangePage,
+                    url
+                }).await;
+            });
+        });
 
         // Generate book marks menu
         let bookmark_menu = Menu::builder().build();
@@ -175,20 +282,9 @@ impl AppState {
 
                     info!("Found local bookmark: {} -> '{}'.", name, bm_url);
 
-                    let item_tx = tx.clone();
-                    let item = cascade! {
-                        MenuItem::with_label(name.as_str());
-                            ..connect_activate(move |_| {
-                                let tx = item_tx.clone();
-                                let url = bm_url.clone();
-                                spawn(async move {
-                                    let _ = tx.send(Event {
-                                        tp: EventType::ChangePage,
-                                        url
-                                    }).await;
-                                });
-                            });
-                    };
+                    let item = AppState::create_bookmark_item(
+                        tx.clone(), &name, &bm_url
+                    );
                     bookmark_menu.append(&item);
                 }, _ => {
                     let fldr_name = folder[0][0].clone();
@@ -206,20 +302,9 @@ impl AppState {
                             fldr_name, name, bm_url
                         );
 
-                        let item_tx = tx.clone();
-                        let item = cascade! {
-                            MenuItem::with_label(name.as_str());
-                                ..connect_activate(move |_| {
-                                    let tx = item_tx.clone();
-                                    let url = bm_url.clone();
-                                    spawn(async move {
-                                        let _ = tx.send(Event {
-                                            tp: EventType::ChangePage,
-                                            url
-                                        }).await;
-                                    });
-                                });
-                        };
+                        let item = AppState::create_bookmark_item(
+                            tx.clone(), &name, &bm_url
+                        );
                         sub_menu.append(&item);
                     }
 
@@ -320,6 +405,7 @@ impl AppState {
             view_cont.attach(&sync_btn, 9, 0, 1, 1);
         }
 
+        // Main view
         let view = cascade! {
             Box::new(Orientation::Vertical, 0);
                 ..pack_start(&view_cont, false, false, 0);
@@ -345,223 +431,46 @@ impl AppState {
             tb_buff: buff
         }
     }
-}
 
-pub fn start_browser() {
-    set_program_name(APP_NAME.into());
-    set_application_name(APP_NAME);
-
-    // Initialize gtk
-    if init().is_err() {
-        error!("Failed to initialize GTK Application!");
-        panic!("Failed to initialize GTK Application!");
+    fn load_config() -> AppConfig {
+        match load(APP_NAME) {
+            Err(_) => {
+                warn!("Error in config! Using defaults.");
+                AppConfig::default()
+            }, Ok(config) => config
+        }
     }
 
-    // Attach tx to widgets and rx to handler
-    let (tx, rx) = unbounded();
-    let app = AppState::new(tx);
+    fn try_sync_bookmarks() {
+        let mut temp_cfg = AppState::load_config(); // Load local
+        if !temp_cfg.local {
+            // TODO: Sync via db
+            let synced_bm = Vec::new();
 
-    let mut via_nav_btns = false;
-    let mut back_urls = vec![ app.cfg.start_page ];
-    let mut fwd_urls: Vec<String> = Vec::new();
-
-    let mut err_url = String::new();
-
-    let event_handler = async move {
-        while let Ok(event) = rx.recv().await {
-
-            /*debug!("Back urls:");
-            for url in back_urls.clone() {
-                debug!("Back: {}.", url);
-            }
-            debug!("Forward urls:");
-            for url in fwd_urls.clone() {
-                debug!("Forward: {}.", url);
-            }*/
-
-            match event.tp {
-                EventType::BackClicked => {
-                    if back_urls.len() > 0 {
-                        let new_url = back_urls.pop().unwrap();
-                        fwd_urls.insert(0, new_url.clone());
-
-                        via_nav_btns = true;
-                        app.web_view.load_uri(&new_url);
-
-                        info!("Back to {}.", new_url);
-
-                        app.tb_buff.set_text(new_url.as_str());
-                    }
-                }, EventType::ForwardClicked => {
-                    if fwd_urls.len() > 0 {
-                        let new_url = fwd_urls.pop().unwrap();
-                        back_urls.push(new_url.clone());
-
-                        via_nav_btns = true;
-                        app.web_view.load_uri(&new_url);
-
-                        info!("Forward to {}.", new_url);
-
-                        app.tb_buff.set_text(new_url.as_str());
-                    }
-                }, EventType::RefreshClicked => {
-                    via_nav_btns = true;
-                    app.web_view.reload();
-                }, EventType::ChangedPage => {
-                    info!("Changed page to {}.", event.url);
-
-                    // Don't re-navigate after pressing back
-                    if via_nav_btns {
-                        via_nav_btns = false;
-                        continue;
-                    }
-
-                    fwd_urls = Vec::new();
-                    fwd_urls.push(event.url.clone());
-
-                    app.tb_buff.set_text(event.url.as_str());
-                }, EventType::ChangePage => {
-                    app.web_view.load_uri(&event.url);
-                }, EventType::FailedChangePage => {
-                    warn!("Failed to change page to {}.", event.url);
-
-                    match back_urls.clone().iter().position(
-                                |e| *e == event.url
-                            ) {
-                        None => {},
-                        Some(pos) => { back_urls.remove(pos); }
-                    }
-                    match fwd_urls.clone().iter().position(
-                                |e| *e == event.url
-                            ) {
-                        None => {},
-                        Some(pos) => { fwd_urls.remove(pos); }
-                    }
-
-                    if event.url == err_url {
-                        warn!("Site unreachable. Loading error page.");
-                        app.tb_buff.set_text("about:blank");
-                        app.web_view.load_uri("about:blank");
-                    } else {
-                        err_url =
-                            app.cfg.search_engine.replace("${}", &event.url);
-                        app.web_view.load_uri(err_url.as_str());
-                    }
-                }, EventType::LoginRegister => {
-                    /* Create a login prompt */
-                    let dialog = cascade! {
-                        Dialog::with_buttons(
-                            Some("Sign In"), Some(&app.win),
-                            DialogFlags::from_bits(1).unwrap(),
-                            &[ ]
-                        );
-                        ..set_default_size(POPUP_WIDTH, POPUP_HEIGHT);
-                        ..set_modal(true);
-                        ..set_resizable(false);
-                        ..add_button("Register", ResponseType::Apply);
-                        ..add_button("Login", ResponseType::Accept);
-                        ..add_button("Cancel", ResponseType::Cancel);
-                    };
-                    let content_area = dialog.content_area();
-
-                    let uname_buff = EntryBuffer::new(Some(""));
-                    let uname = cascade! {
-                        Box::new(Orientation::Horizontal, 0);
-                            ..pack_start(
-                                &Label::new(Some("Username: ")),
-                                false, false, app.cfg.margin
-                            );..pack_start(
-                                &Entry::builder()
-                                    .buffer(&uname_buff).hexpand(true)
-                                    .build(),
-                                true, true, app.cfg.margin
-                            );
-                    };
-                    content_area.pack_start(&uname, true, true, app.cfg.margin);
-
-                    let pword_buff = EntryBuffer::new(Some(""));
-                    let pword = cascade! {
-                        Box::new(Orientation::Horizontal, 0);
-                            ..pack_start(
-                                &Label::new(Some("Password: ")),
-                                false, false, app.cfg.margin
-                            );..pack_start(
-                                &Entry::builder()
-                                    .buffer(&pword_buff).hexpand(true)
-                                    .visibility(false)
-                                    .build(),
-                                true, true, app.cfg.margin
-                            );
-                    };
-                    content_area.pack_start(&pword, true, true, app.cfg.margin);
-                    
-                    let remem = cascade! {
-                        Box::new(Orientation::Horizontal, 0);
-                            ..pack_start(
-                                &CheckButton::with_label("Remember"),
-                                true, true, app.cfg.margin
-                            );
-                    };
-                    content_area.pack_start(&remem, true, true, app.cfg.margin);
-                    
-                    dialog.connect_response(move |view, resp| {
-                        let username = pword_buff.text().clone();
-                        let password = pword_buff.text().clone();
-                        match resp {
-                            ResponseType::Cancel => view.hide(),
-                            ResponseType::Accept => { // Login
-                                info!("Attempting to login to sync.");
-
-                                let rt = Runtime::new().unwrap();
-                                let salt_fut = query_salt(&username);
-                                let salt_res = rt.block_on(salt_fut);
-
-                                match salt_res {
-                                    Err(err) => {
-                                        error!(
-                                            "Error logging in {}.",
-                                            err
-                                        );
-
-                                        let err_dialog = cascade! {
-                                            Dialog::new();
-                                                ..set_title("Error!");
-                                                ..add_button(
-                                                    "Okay",
-                                                    ResponseType::Cancel
-                                                );..connect_response(
-                                                    move |view, _| {
-                                                        view.hide();
-                                                    }
-                                                );..set_modal(true);
-                                        };
-                                        let _con = cascade! {
-                                            err_dialog.content_area();
-                                                ..pack_start(
-                                                    &Label::new(Some(
-                                                        format!("{}", err)
-                                                            .as_str()
-                                                    )), true, true,
-                                                    0
-                                                );
-                                        };
-                                        err_dialog.show_all();
-                                        return;
-                                    }, Ok(salt) => {
-                                        
-                                    }
-                                }
-                            }, ResponseType::Apply => { // Register
-                                // Check to see if a user exists
-                            }, _ => view.hide()
-                        }
-                    });
-                    dialog.show_all();
-                }
+            if false { // TODO: Check for changes
+                temp_cfg.bookmarks = synced_bm.clone();
+                store(APP_NAME, temp_cfg).unwrap();
             }
         }
-    };
-    MainContext::default().spawn_local(event_handler);
+    }
 
-    main();
+    fn create_bookmark_item(
+            tx: Sender<Event>, name: &String, bm_url: &String) -> MenuItem {
+        let item_tx = tx.clone();
+        let bm_url_cpy = bm_url.clone();
+        let item = cascade! {
+            MenuItem::with_label(name.as_str());
+                ..connect_activate(move |_| {
+                    let tx = item_tx.clone();
+                    let url = bm_url_cpy.clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::ChangePage,
+                            url
+                        }).await;
+                    });
+                });
+        };
+        item
+    }
 }

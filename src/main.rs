@@ -3,6 +3,7 @@
  * Description: Entry point for the simple web browser
  */
 
+mod gui;
 mod app;
 mod db;
 

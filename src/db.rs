@@ -11,7 +11,8 @@ use serde::{ Serialize, Deserialize };
 use std::error::Error;
 use log::info;
 
-const DB_URL: &'static str = "mongodb://blueokiris.com:27017";
+const DB_LOGIN: &'static str =
+    "mongodb://simple_web_browser:password@blueokiris.com:27017";
 
 /*
  * Users exist as the following structure:
@@ -43,20 +44,6 @@ struct User {
     password_hash: String
 }
 
-// Query the user's salt from the database
-pub async fn query_salt(username: &String) -> Result<String, Box<dyn Error>> {
-    info!("Connecting to sync server.");
-    let client = Client::with_uri_str(DB_URL).await?;
-    let bm_db = client.database("bookmarks");
-    let users: Collection<User> = bm_db.collection("users");
-    info!("Successfully connected to sync server.");
-
-    let filter = doc! { "username": username.clone() };
-    let result = users.find_one(filter, None).await?;
-    match result {
-        Some(ref user) => {
-            info!("Retrieved user salt: {}", user.password_salt);
-            Ok(user.password_salt.clone())
-        }, None => Err(format!("User not found: {}", username).to_owned())?
-    }
+pub fn query_salt(username: &String) -> Result<String, String> {
+    Ok(String::new())
 }
