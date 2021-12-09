@@ -5,11 +5,10 @@
 
 use gtk::{
     Box, EntryBuffer, Entry, Label, Dialog, ToggleButton, Window,
-    Button,
     Orientation, ResponseType, DialogFlags,
-    prelude::{ BoxExt, DialogExt, GtkWindowExt, WidgetExt, ContainerExt }
+    prelude::{ BoxExt, DialogExt, GtkWindowExt, WidgetExt }
 };
-use log::{ error };
+use log::{ error, info };
 use cascade::cascade;
 
 const POPUP_WIDTH: i32 = 300;
@@ -17,7 +16,7 @@ const POPUP_HEIGHT: i32 = 200;
 
 pub struct LoginState {
     pub dialog: Dialog,
-    pub uname_buff: EntryBuffer,
+    pub email_buff: EntryBuffer,
     pub pword_buff: EntryBuffer,
     pub remem_box: ToggleButton
 }
@@ -39,35 +38,35 @@ pub fn create_login_dialog(padding: u32, win: &Window) -> LoginState {
     };
     let content_area = dialog.content_area();
 
-    let (uname, uname_buff) = create_username_box(padding);
-    content_area.pack_start(&uname, true, true, padding);
+    let (email, email_buff) = create_email_box(padding);
+    content_area.pack_start(&email, true, true, padding);
     
     let (pword, pword_buff) = create_password_box(padding);
     content_area.pack_start(&pword, true, true, padding);
 
-    let remem_box = ToggleButton::with_label("Remember");
+    let remem_box = ToggleButton::with_label("Click to Remember");
     let remem = cascade! {
         Box::new(Orientation::Horizontal, 0);
             ..pack_start(&remem_box, true, true, padding);
     };
     content_area.pack_start(&remem, true, true, padding);
 
-    LoginState { dialog, uname_buff, pword_buff, remem_box }
+    LoginState { dialog, email_buff, pword_buff, remem_box }
 }
 
 // Generate a field for a username textbox
-fn create_username_box(padding: u32) -> (Box, EntryBuffer) {
-    let uname_buff = EntryBuffer::new(Some(""));
-    let uname = cascade! {
+fn create_email_box(padding: u32) -> (Box, EntryBuffer) {
+    let email_buff = EntryBuffer::new(Some(""));
+    let email = cascade! {
         Box::new(Orientation::Horizontal, 0);
             ..pack_start(
                 &Label::new(Some("Username: ")), false, false, padding
             );..pack_start(
-                &Entry::builder().buffer(&uname_buff).hexpand(true).build(),
+                &Entry::builder().buffer(&email_buff).hexpand(true).build(),
                 true, true, padding
             );
     };
-    (uname, uname_buff)
+    (email, email_buff)
 }
 
 // Do the same with a password
@@ -105,4 +104,23 @@ pub fn create_error_popup(err: &String) {
             );
     };
     err_dialog.show_all();
+}
+
+pub fn create_success_popup(msg: &String) {
+    info!("{}.", msg);
+    let success_dialog = cascade! {
+        Dialog::new();
+            ..set_title("Success!");
+            ..add_button("Okay", ResponseType::Cancel);
+            ..connect_response(move |view, _| { view.hide(); });
+            ..set_modal(true);
+    };
+    let _con = cascade! {
+        success_dialog.content_area();
+            ..pack_start(
+                &Label::new(Some(format!("{}", msg).as_str())),
+                true, true, 0
+            );
+    };
+    success_dialog.show_all();
 }

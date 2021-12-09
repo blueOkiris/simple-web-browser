@@ -22,8 +22,10 @@ use log::{ warn, error, info };
 use confy::{ load, store };
 use cascade::cascade;
 
-use crate::gui::{ create_error_popup, create_login_dialog };
-use crate::db::query_salt;
+use crate::gui::{
+    create_error_popup, create_login_dialog, create_success_popup
+};
+use crate::db::{ login, register };
 
 const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
@@ -139,29 +141,50 @@ pub fn start_browser() {
                     }
                 }, EventType::LoginRegister => {
                     /* Create a login prompt */
-                    let login = create_login_dialog(app.cfg.margin, &app.win);
-                    login.dialog.connect_response(move |view, resp| {
-                        let username = login.uname_buff.text().clone();
-                        let password = login.pword_buff.text().clone();
+                    let login_w = create_login_dialog(app.cfg.margin, &app.win);
+                    login_w.dialog.connect_response(move |view, resp| {
+                        let email = login_w.email_buff.text().clone();
+                        let password = login_w.pword_buff.text().clone();
                         match resp {
                             ResponseType::Cancel => view.hide(),
                             ResponseType::Accept => { // Login
                                 info!("Attempting to login to sync.");
 
-                                let salt_res = query_salt(&username);
+                                let try_login = login(&email, &password);
 
-                                match salt_res {
-                                    Err(err) => create_error_popup(&err),
-                                    Ok(salt) => {
-                                        
+                                match try_login {
+                                    Err(err) => create_error_popup(
+                                        &format!("{}", err)
+                                    ), Ok(_) => {
+                                        view.hide();
+                                        create_success_popup(&String::from(
+                                            "Succesfully logged in."
+                                        ));
+
+                                        // Set up bookmark sync and stuff
                                     }
                                 }
                             }, ResponseType::Apply => { // Register
-                                
+                                info!("Attempting to register new user.");
+
+                                let try_register = register(&email, &password);
+
+                                match try_register {
+                                    Err(err) => create_error_popup(
+                                        &format!("{}", err)
+                                    ), Ok(_) => {
+                                        view.hide();
+                                        create_success_popup(&String::from(
+                                            "Succesfully registered."
+                                        ));
+
+                                        // Set up bookmark sync and stuff
+                                    }
+                                }
                             }, _ => view.hide()
                         }
                     });
-                    login.dialog.show_all();
+                    login_w.dialog.show_all();
                 }
             }
         }
