@@ -5,14 +5,17 @@
 
 use gtk::{
     Box, EntryBuffer, Entry, Label, Dialog, ToggleButton, Window,
-    Orientation, ResponseType, DialogFlags,
-    prelude::{ BoxExt, DialogExt, GtkWindowExt, WidgetExt }
+    Orientation, ResponseType, DialogFlags, ScrolledWindow, Adjustment,
+    prelude::{ BoxExt, DialogExt, GtkWindowExt, WidgetExt, ContainerExt }
 };
 use log::{ error, info };
 use cascade::cascade;
 
-const POPUP_WIDTH: i32 = 300;
-const POPUP_HEIGHT: i32 = 200;
+const LOGIN_POPUP_WIDTH: i32 = 300;
+const LOGIN_POPUP_HEIGHT: i32 = 200;
+
+const BM_POPUP_WIDTH: i32 = 300;
+const BM_POPUP_HEIGHT: i32 = 80;
 
 pub struct LoginState {
     pub dialog: Dialog,
@@ -29,7 +32,7 @@ pub fn create_login_dialog(padding: u32, win: &Window) -> LoginState {
             DialogFlags::from_bits(1).unwrap(),
             &[ ]
         );
-        ..set_default_size(POPUP_WIDTH, POPUP_HEIGHT);
+        ..set_default_size(LOGIN_POPUP_WIDTH, LOGIN_POPUP_HEIGHT);
         ..set_modal(true);
         ..set_resizable(false);
         ..add_button("Register", ResponseType::Apply);
@@ -93,17 +96,21 @@ pub fn create_error_popup(err: &String) {
         Dialog::new();
             ..set_title("Error!");
             ..add_button("Okay", ResponseType::Cancel);
+            ..set_default_size(LOGIN_POPUP_WIDTH, LOGIN_POPUP_HEIGHT);
             ..connect_response(move |view, _| { view.hide(); });
             ..set_modal(true);
     };
     let _con = cascade! {
         err_dialog.content_area();
-            ..pack_start(
-                &Label::new(Some(format!("{}", err).as_str())),
-                true, true, 0
-            );
+            ..pack_start(&create_scrollable_label(&err), true, true, 0);
     };
     err_dialog.show_all();
+}
+
+pub fn create_scrollable_label(msg: &String) -> ScrolledWindow {
+    let scroll_view = ScrolledWindow::new::<Adjustment, Adjustment>(None, None);
+    scroll_view.add(&Label::new(Some(msg.as_str())));
+    scroll_view
 }
 
 pub fn create_success_popup(msg: &String) {
@@ -123,4 +130,54 @@ pub fn create_success_popup(msg: &String) {
             );
     };
     success_dialog.show_all();
+}
+
+pub struct AddBookmark {
+    pub dialog: Dialog,
+    pub name: EntryBuffer
+}
+
+// Create popup for adding a new bookmark
+pub fn create_bookmark_add_dialog(
+        padding: u32, win: &Window, url: &String) -> AddBookmark {
+    let dialog = cascade! {
+        Dialog::with_buttons(
+            Some("Add Bookmark"), Some(win),
+            DialogFlags::from_bits(1).unwrap(),
+            &[ ]
+        );
+        ..set_default_size(BM_POPUP_WIDTH, BM_POPUP_HEIGHT);
+        ..set_modal(true);
+        ..set_resizable(false);
+        ..add_button("Add", ResponseType::Accept);
+        ..add_button("Cancel", ResponseType::Cancel);
+    };
+    let content_area = dialog.content_area();
+
+    let (name, name_buff) = create_name_field(padding);
+    content_area.pack_start(&name, true, true, padding);
+
+    content_area.pack_start(
+        &create_scrollable_label(&url), true, true, padding
+    );
+
+    AddBookmark {
+        dialog,
+        name: name_buff
+    }
+}
+
+// Generate a field for a username textbox
+fn create_name_field(padding: u32) -> (Box, EntryBuffer) {
+    let email_buff = EntryBuffer::new(Some(""));
+    let email = cascade! {
+        Box::new(Orientation::Horizontal, 0);
+            ..pack_start(
+                &Label::new(Some("Name: ")), false, false, padding
+            );..pack_start(
+                &Entry::builder().buffer(&email_buff).hexpand(true).build(),
+                true, true, padding
+            );
+    };
+    (email, email_buff)
 }

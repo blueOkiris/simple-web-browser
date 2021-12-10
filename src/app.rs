@@ -18,12 +18,13 @@ use gtk::{
 };
 use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
 use serde::{ Serialize, Deserialize };
-use log::{ warn, error, info };
+use log::{ warn, error, info, debug };
 use confy::{ load, store };
 use cascade::cascade;
 
 use crate::gui::{
-    create_error_popup, create_login_dialog, create_success_popup
+    create_error_popup, create_login_dialog, create_success_popup,
+    create_bookmark_add_dialog
 };
 use crate::db::{ login, register };
 
@@ -36,7 +37,18 @@ const APP_NAME: &'static str = "swb";
 fn spawn<F>(future: F) where F: Future<Output = ()> + 'static {
     MainContext::default().spawn_local(future);
 }
-    
+
+enum EventType {
+    BackClicked,
+    ForwardClicked,
+    RefreshClicked,
+    ChangedPage,
+    ChangePage,
+    FailedChangePage,
+    LoginRegister,
+    AddBookmark
+}
+
 pub fn start_browser() {
     set_program_name(APP_NAME.into());
     set_application_name(APP_NAME);
@@ -61,28 +73,23 @@ pub fn start_browser() {
 
     let event_handler = async move {
         while let Ok(event) = rx.recv().await {
-
-            /*debug!("Back urls:");
-            for url in back_urls.clone() {
-                debug!("Back: {}.", url);
-            }
-            debug!("Forward urls:");
-            for url in fwd_urls.clone() {
-                debug!("Forward: {}.", url);
-            }*/
-
             match event.tp {
                 EventType::BackClicked => {
-                    if back_urls.len() > 0 {
+                    if back_urls.len() > 1 {
                         let new_url = back_urls.pop().unwrap();
-                        fwd_urls.insert(0, new_url.clone());
+                        fwd_urls.push(new_url.clone());
 
                         via_nav_btns = true;
-                        app.web_view.load_uri(&new_url);
+                        app.web_view.load_uri(
+                            // account for current being stored
+                            &back_urls[back_urls.len() - 1]
+                        );
 
-                        info!("Back to {}.", new_url);
+                        info!("Back to {}.", back_urls[back_urls.len() - 1]);
 
-                        app.tb_buff.set_text(new_url.as_str());
+                        app.tb_buff.set_text(
+                            back_urls[back_urls.len() - 1].as_str()
+                        );
                     }
                 }, EventType::ForwardClicked => {
                     if fwd_urls.len() > 0 {
@@ -109,7 +116,7 @@ pub fn start_browser() {
                     }
 
                     fwd_urls = Vec::new();
-                    fwd_urls.push(event.url.clone());
+                    back_urls.push(event.url.clone());
 
                     app.tb_buff.set_text(event.url.as_str());
                 }, EventType::ChangePage => {
@@ -185,7 +192,27 @@ pub fn start_browser() {
                         }
                     });
                     login_w.dialog.show_all();
+                }, EventType::AddBookmark => {
+                    let bm_win = create_bookmark_add_dialog(
+                        app.cfg.margin, &app.win, &app.tb_buff.text()
+                    );
+                    bm_win.dialog.connect_response(move |view, resp| {
+                        match resp {
+                            ResponseType::Cancel => view.hide(),
+                            _ => view.hide()
+                        }
+                    });
+                    bm_win.dialog.show_all();
                 }
+            }
+
+            debug!("Back urls:");
+            for url in back_urls.clone() {
+                debug!("Back: {}.", url);
+            }
+            debug!("Forward urls:");
+            for url in fwd_urls.clone() {
+                debug!("Forward: {}.", url);
             }
         }
     };
@@ -208,7 +235,7 @@ struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            start_page: String::from("https://duckduckgo.org"),
+            start_page: String::from("https://duckduckgo.com"),
             search_engine: String::from("https://duckduckgo.com/?q=${}"),
             local: true,
             bookmarks: Vec::new(),
@@ -217,16 +244,6 @@ impl Default for AppConfig {
             margin: 10
         }
     }
-}
-
-enum EventType {
-    BackClicked,
-    ForwardClicked,
-    RefreshClicked,
-    ChangedPage,
-    ChangePage,
-    FailedChangePage,
-    LoginRegister
 }
 
 struct Event {
@@ -294,6 +311,7 @@ impl AppState {
 
         // Generate book marks menu
         let bookmark_menu = Menu::builder().build();
+        bookmark_menu.append(&AppState::create_add_bookmark_btn(tx.clone()));
         for folder in cfg.bookmarks.clone() {
             match folder.len() {
                 0 => { },
@@ -368,7 +386,7 @@ impl AppState {
             WebView::builder().build();
                 ..load_uri(&start_page);
                 ..connect_load_changed(move |view, load_ev| {
-                    if load_ev == LoadEvent::Started {
+                    if load_ev == LoadEvent::Finished {
                         let tx = web_tx1.clone();
                         let txt = WebView::uri(&view).unwrap().to_string();
                         spawn(async move {
@@ -490,6 +508,23 @@ impl AppState {
                         let _ = tx.send(Event {
                             tp: EventType::ChangePage,
                             url
+                        }).await;
+                    });
+                });
+        };
+        item
+    }
+
+    fn create_add_bookmark_btn(tx: Sender<Event>) -> MenuItem {
+        let item_tx = tx.clone();
+        let item = cascade! {
+            MenuItem::with_label("Add Bookmark");
+                ..connect_activate(move |_| {
+                    let tx = item_tx.clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::AddBookmark,
+                            url: String::new()
                         }).await;
                     });
                 });
