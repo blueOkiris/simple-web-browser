@@ -21,5 +21,7 @@ Install Dependencies:
  - libgdk-pixbuf2.0-dev
  - libsoup2.4-dev
  - libgdk-3-dev
+ - make
+ - gcc
 
-`cargo build --release`
+Run the build script: `./build.sh`

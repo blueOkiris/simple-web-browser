@@ -16,7 +16,7 @@ use gtk::{
         DialogExt, EntryExt
     }, glib::{ set_program_name, set_application_name, MainContext }
 };
-use webkit2gtk::{ WebView, LoadEvent, traits::WebViewExt };
+use webkit2gtk::{ WebView, LoadEvent, WebContext, traits::{ WebViewExt, WebContextExt } };
 use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info, debug };
 use confy::{ load, store };
@@ -33,6 +33,7 @@ const WIN_TITLE: &'static str = "Browse the Web";
 const WIN_DEF_WIDTH: i32 = 640;
 const WIN_DEF_HEIGHT: i32 = 480;
 const APP_NAME: &'static str = "swb";
+const EXTENSION_DIR: &'static str = "/home/dylan/.swb-extensions";
 
 // Spawns a task on default executor, without waiting to complete
 fn spawn<F>(future: F) where F: Future<Output = ()> + 'static {
@@ -50,7 +51,8 @@ enum EventType {
     LoginRegister,
     AddFolder,
     AddBookmark, // Prompt for adding a bookmark
-    DeleteBookmarkOrFolder
+    DeleteBookmarkOrFolder,
+    OpenBlockMenu
 }
 
 struct Event {
@@ -141,6 +143,11 @@ pub fn start_browser() {
                 }, EventType::RefreshClicked => {
                     via_nav_btns = true;
                     app.web_view.reload();
+                    None
+                }, EventType::OpenBlockMenu => {
+                    err_url = app.tb_buff.text().clone();
+                    app.web_view.load_uri("blockit://settings");
+                    via_nav_btns = true;
                     None
                 }, EventType::ChangedPage => {
                     info!("Changed page to {}.", event.url);
@@ -513,11 +520,29 @@ impl AppState {
                 });
         };
 
+        let block_tx = tx.clone();
+        let block_btn = cascade! {
+            Button::with_label("⯃");
+                ..set_border_width(cfg.margin);
+                ..connect_clicked(move |_| {
+                    let tx = block_tx.clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::OpenBlockMenu, url: String::new()
+                        }).await;
+                    });
+                });
+        };
+
         /* Create page view */
         let web_tx1 = tx.clone();
         let web_tx2 = tx.clone();
+        let ctx = cascade! {
+            WebContext::default().unwrap();
+                ..set_web_extensions_directory(EXTENSION_DIR);
+        };
         let web_view = cascade! {
-            WebView::builder().build();
+            WebView::builder().web_context(&ctx).build();
                 ..load_uri(&start_page);
                 ..connect_load_changed(move |view, load_ev| {
                     if load_ev == LoadEvent::Finished {
@@ -559,6 +584,7 @@ impl AppState {
                 ..attach(&tb, 2, 0, 5, 1);
                 ..attach(&bm_btn, 7, 0, 1, 1);
                 ..attach(&refr_btn, 8, 0, 1, 1);
+                ..attach(&block_btn, 9, 0, 1, 1);
         };
 
         // Sync popup button
