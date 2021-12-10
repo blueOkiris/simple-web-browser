@@ -14,7 +14,7 @@ use cascade::cascade;
 const LOGIN_POPUP_WIDTH: i32 = 300;
 const LOGIN_POPUP_HEIGHT: i32 = 200;
 
-const BM_POPUP_WIDTH: i32 = 300;
+const BM_POPUP_WIDTH: i32 = 350;
 const BM_POPUP_HEIGHT: i32 = 80;
 
 pub struct LoginState {
@@ -132,17 +132,84 @@ pub fn create_success_popup(msg: &String) {
     success_dialog.show_all();
 }
 
-pub struct AddBookmark {
+pub struct BookmarkResult {
     pub dialog: Dialog,
-    pub name: EntryBuffer
+    pub name: EntryBuffer,
+    pub fldr: EntryBuffer,
+    pub url: String
 }
 
 // Create popup for adding a new bookmark
 pub fn create_bookmark_add_dialog(
-        padding: u32, win: &Window, url: &String) -> AddBookmark {
+        padding: u32, win: &Window, url: &String) -> BookmarkResult {
     let dialog = cascade! {
         Dialog::with_buttons(
             Some("Add Bookmark"), Some(win),
+            DialogFlags::from_bits(1).unwrap(),
+            &[ ]
+        );
+        ..set_default_size(BM_POPUP_WIDTH, BM_POPUP_HEIGHT);
+        ..set_modal(true);
+        ..set_resizable(false);
+        ..add_button("Add", ResponseType::Accept);
+        ..add_button("Cancel", ResponseType::Cancel);
+    };
+    let content_area = dialog.content_area();
+
+    let (name, name_buff) = create_name_field(padding);
+    content_area.pack_start(&name, true, true, padding);
+
+    let (fldr, fldr_buff) = create_fldr_field(padding);
+    content_area.pack_start(&fldr, true, true, padding);
+
+    content_area.pack_start(
+        &create_scrollable_label(&url), true, true, padding
+    );
+
+    BookmarkResult {
+        dialog,
+        name: name_buff,
+        fldr: fldr_buff,
+        url: url.clone()
+    }
+}
+
+// Generate a field for a name textbox
+fn create_name_field(padding: u32) -> (Box, EntryBuffer) {
+    let name_buff = EntryBuffer::new(Some(""));
+    let name = cascade! {
+        Box::new(Orientation::Horizontal, 0);
+            ..pack_start(
+                &Label::new(Some("Name: ")), false, false, padding
+            );..pack_start(
+                &Entry::builder().buffer(&name_buff).hexpand(true).build(),
+                true, true, padding
+            );
+    };
+    (name, name_buff)
+}
+
+fn create_fldr_field(padding: u32) -> (Box, EntryBuffer) {
+    let fldr_buff = EntryBuffer::new(Some(""));
+    let fldr = cascade! {
+        Box::new(Orientation::Horizontal, 0);
+            ..pack_start(
+                &Label::new(Some("Folder (Blank is TopLevel): ")),
+                false, false, padding
+            );..pack_start(
+                &Entry::builder().buffer(&fldr_buff).hexpand(true).build(),
+                true, true, padding
+            );
+    };
+    (fldr, fldr_buff)
+}
+
+// Create popup for adding a new folder
+pub fn create_folder_add_dialog(
+        padding: u32, win: &Window, url: &String) -> BookmarkResult {
+    let dialog = cascade! {
+        Dialog::with_buttons(
+            Some("Add Folder"), Some(win),
             DialogFlags::from_bits(1).unwrap(),
             &[ ]
         );
@@ -161,23 +228,38 @@ pub fn create_bookmark_add_dialog(
         &create_scrollable_label(&url), true, true, padding
     );
 
-    AddBookmark {
+    BookmarkResult {
         dialog,
-        name: name_buff
+        name: name_buff.clone(),
+        fldr: name_buff,
+        url: url.clone()
     }
 }
 
-// Generate a field for a username textbox
-fn create_name_field(padding: u32) -> (Box, EntryBuffer) {
-    let email_buff = EntryBuffer::new(Some(""));
-    let email = cascade! {
-        Box::new(Orientation::Horizontal, 0);
-            ..pack_start(
-                &Label::new(Some("Name: ")), false, false, padding
-            );..pack_start(
-                &Entry::builder().buffer(&email_buff).hexpand(true).build(),
-                true, true, padding
-            );
+// Create popup for deleting a new bookmark
+pub fn create_bookmark_delete_dialog(
+        padding: u32, win: &Window) -> BookmarkResult {
+    let dialog = cascade! {
+        Dialog::with_buttons(
+            Some("Delete Bookmark"), Some(win),
+            DialogFlags::from_bits(1).unwrap(),
+            &[ ]
+        );
+        ..set_default_size(BM_POPUP_WIDTH, BM_POPUP_HEIGHT);
+        ..set_modal(true);
+        ..set_resizable(false);
+        ..add_button("Delete", ResponseType::Accept);
+        ..add_button("Cancel", ResponseType::Cancel);
     };
-    (email, email_buff)
+    let content_area = dialog.content_area();
+
+    let (name, name_buff) = create_name_field(padding);
+    content_area.pack_start(&name, true, true, padding);
+
+    BookmarkResult {
+        dialog,
+        name: name_buff.clone(),
+        fldr: name_buff,
+        url: String::new()
+    }
 }

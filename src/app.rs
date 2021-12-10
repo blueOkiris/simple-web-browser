@@ -4,10 +4,10 @@
  */
 
 use std::future::Future;
-use async_channel::{ unbounded, Sender };
+use async_channel::{ unbounded, Sender, Receiver };
 use gtk::{
     main_quit, Inhibit, init, main,
-    Button, Box, Orientation, Entry, EntryBuffer, Grid,
+    Button, Box, Orientation, Entry, EntryBuffer, Grid, Dialog,
     Menu, MenuItem, MenuButton,
     Window, WindowType, Align, ResponseType,
     prelude::{
@@ -24,7 +24,8 @@ use cascade::cascade;
 
 use crate::gui::{
     create_error_popup, create_login_dialog, create_success_popup,
-    create_bookmark_add_dialog
+    create_bookmark_add_dialog, create_bookmark_delete_dialog,
+    create_folder_add_dialog
 };
 use crate::db::{ login, register };
 
@@ -38,15 +39,37 @@ fn spawn<F>(future: F) where F: Future<Output = ()> + 'static {
     MainContext::default().spawn_local(future);
 }
 
+#[derive(PartialEq)]
 enum EventType {
     BackClicked,
     ForwardClicked,
     RefreshClicked,
-    ChangedPage,
-    ChangePage,
+    ChangedPage, // On a page going through
+    ChangePage, // Sent by a but TO change page
     FailedChangePage,
     LoginRegister,
-    AddBookmark
+    AddFolder,
+    AddBookmark, // Prompt for adding a bookmark
+    DeleteBookmarkOrFolder
+}
+
+struct Event {
+    pub tp: EventType,
+    pub url: String
+}
+
+enum ModAppType {
+    CreateBookmark,
+    ChangeTbBuffer
+}
+
+struct ModApp {
+    tp: ModAppType,
+    tb_new_val: String,
+    name_buff: Option<EntryBuffer>,
+    fldr_buff: Option<EntryBuffer>,
+    dialog: Option<Dialog>,
+    url: String
 }
 
 pub fn start_browser() {
@@ -61,19 +84,22 @@ pub fn start_browser() {
 
     // Attach tx to widgets and rx to handler
     let (tx, rx) = unbounded();
-    let app = AppState::new(tx);
-
-    // Store some state so the application can go back and forth
-    let mut via_nav_btns = false;
-    let mut back_urls = vec![ app.cfg.start_page ];
-    let mut fwd_urls: Vec<String> = Vec::new();
-
-    // We try to search first, but we store it so if we fail again actually fail
-    let mut err_url = String::new();
 
     let event_handler = async move {
-        while let Ok(event) = rx.recv().await {
-            match event.tp {
+        let mut app = AppState::new(tx);
+        
+        // Store some state so the application can go back and forth
+        let mut via_nav_btns = false;
+        let mut back_urls = vec![ app.cfg.start_page.clone() ];
+        let mut fwd_urls: Vec<String> = Vec::new();
+
+        // We try to search first, but we store it so if we fail again fail
+        let mut err_url = String::new();
+
+        let quit = false;
+        while !quit {
+            let event = rx.recv().await.unwrap();
+            let new_ev = match event.tp {
                 EventType::BackClicked => {
                     if back_urls.len() > 1 {
                         let new_url = back_urls.pop().unwrap();
@@ -86,11 +112,13 @@ pub fn start_browser() {
                         );
 
                         info!("Back to {}.", back_urls[back_urls.len() - 1]);
-
-                        app.tb_buff.set_text(
-                            back_urls[back_urls.len() - 1].as_str()
-                        );
                     }
+                    Some(ModApp {
+                        tp: ModAppType::ChangeTbBuffer,
+                        tb_new_val: back_urls[back_urls.len() - 1].clone(),
+                        name_buff: None, fldr_buff: None, dialog: None,
+                        url: String::new()
+                    })
                 }, EventType::ForwardClicked => {
                     if fwd_urls.len() > 0 {
                         let new_url = fwd_urls.pop().unwrap();
@@ -101,11 +129,19 @@ pub fn start_browser() {
 
                         info!("Forward to {}.", new_url);
 
-                        app.tb_buff.set_text(new_url.as_str());
+                        Some(ModApp {
+                            tp: ModAppType::ChangeTbBuffer,
+                            tb_new_val: new_url,
+                            name_buff: None, fldr_buff: None, dialog: None,
+                            url: String::new()
+                        })
+                    } else {
+                        None
                     }
                 }, EventType::RefreshClicked => {
                     via_nav_btns = true;
                     app.web_view.reload();
+                    None
                 }, EventType::ChangedPage => {
                     info!("Changed page to {}.", event.url);
 
@@ -119,8 +155,10 @@ pub fn start_browser() {
                     back_urls.push(event.url.clone());
 
                     app.tb_buff.set_text(event.url.as_str());
+                    None
                 }, EventType::ChangePage => {
                     app.web_view.load_uri(&event.url);
+                    None
                 }, EventType::FailedChangePage => {
                     warn!("Failed to change page to {}.", event.url);
 
@@ -139,16 +177,24 @@ pub fn start_browser() {
 
                     if event.url == err_url {
                         warn!("Site unreachable. Loading error page.");
-                        app.tb_buff.set_text("about:blank");
                         app.web_view.load_uri("about:blank");
+
+                        Some(ModApp {
+                            tp: ModAppType::ChangeTbBuffer,
+                            tb_new_val: String::from("about:blank"),
+                            name_buff: None, fldr_buff: None, dialog: None,
+                            url: String::new()
+                        })
                     } else {
                         err_url =
                             app.cfg.search_engine.replace("${}", &event.url);
                         app.web_view.load_uri(err_url.as_str());
+                        None
                     }
                 }, EventType::LoginRegister => {
                     /* Create a login prompt */
-                    let login_w = create_login_dialog(app.cfg.margin, &app.win);
+                    let login_w = create_login_dialog(
+                        app.cfg.margin, &(app.win.clone()));
                     login_w.dialog.connect_response(move |view, resp| {
                         let email = login_w.email_buff.text().clone();
                         let password = login_w.pword_buff.text().clone();
@@ -192,9 +238,25 @@ pub fn start_browser() {
                         }
                     });
                     login_w.dialog.show_all();
+                    None
                 }, EventType::AddBookmark => {
                     let bm_win = create_bookmark_add_dialog(
-                        app.cfg.margin, &app.win, &app.tb_buff.text()
+                        app.cfg.margin, &(app.win.clone()),
+                        &(app.tb_buff.text().clone())
+                    );
+                    bm_win.dialog.show_all();
+                    Some(ModApp {
+                        tp: ModAppType::CreateBookmark,
+                        tb_new_val: String::new(),
+                        name_buff: Some(bm_win.name),
+                        fldr_buff: Some(bm_win.fldr),
+                        url: bm_win.url,
+                        dialog: Some(bm_win.dialog)
+                    })
+                }, EventType::AddFolder => {
+                    let bm_win = create_bookmark_add_dialog(
+                        app.cfg.margin, &(app.win.clone()),
+                        &(app.tb_buff.text().clone())
                     );
                     bm_win.dialog.connect_response(move |view, resp| {
                         match resp {
@@ -203,6 +265,54 @@ pub fn start_browser() {
                         }
                     });
                     bm_win.dialog.show_all();
+                    None
+                }, EventType::DeleteBookmarkOrFolder => {
+                    let bm_win = create_bookmark_delete_dialog(
+                        app.cfg.margin, &(app.win.clone())
+                    );
+                    bm_win.dialog.connect_response(move |view, resp| {
+                        match resp {
+                            ResponseType::Cancel => view.hide(),
+                            _ => view.hide()
+                        }
+                    });
+                    bm_win.dialog.show_all();
+                    None
+                }
+            };
+            
+            // App state borrowing is finicky, so wait to modify till end
+            match new_ev {
+                None => {},
+                Some(mod_app) => {
+                    match mod_app.tp {
+                        ModAppType::CreateBookmark => {
+                            let dialog = mod_app.dialog.unwrap();
+                            let (tx2, rx2) = unbounded();
+                            dialog.connect_response(move |view, resp| {
+                                match resp {
+                                    ResponseType::Accept => {
+                                        let tx2_clone = tx2.clone();
+                                        spawn(async move {
+                                            let _ = tx2_clone.send(true).await;
+                                        });
+                                        view.hide();
+                                    }, _ => view.hide()
+                                }
+                            });
+                            let _t = rx2.recv().await;
+                            match app.add_bookmark(
+                                        &mod_app.name_buff.unwrap().text(),
+                                        &mod_app.fldr_buff.unwrap().text(),
+                                        &mod_app.url
+                                    ) {
+                                Ok(_) => {},
+                                Err(msg) => create_error_popup(&msg)
+                            }
+                        }, ModAppType::ChangeTbBuffer => {
+                            app.tb_buff.set_text(mod_app.tb_new_val.as_str());
+                        }
+                    }
                 }
             }
 
@@ -246,16 +356,13 @@ impl Default for AppConfig {
     }
 }
 
-struct Event {
-    pub tp: EventType,
-    pub url: String
-}
-
 struct AppState {
     pub win: Window,
     pub web_view: WebView,
     pub cfg: AppConfig,
-    pub tb_buff: EntryBuffer
+    pub tb_buff: EntryBuffer,
+    view: Box,
+    tx: Sender<Event>
 }
 
 impl AppState {
@@ -266,7 +373,88 @@ impl AppState {
         let start_page = cfg.start_page.clone();
 
         /* Create navigation bar */
+        let (view, web_view, tb_buff) = AppState::rebuild_gui(
+            tx.clone(), &start_page, &cfg
+        );
 
+        let win = cascade! {
+            Window::new(WindowType::Toplevel);
+                ..add(&view);
+                ..set_title(WIN_TITLE);
+                ..set_default_size(WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
+                ..connect_delete_event(move |_, _| {
+                    main_quit();
+                    Inhibit(false)
+                });
+                ..show_all();
+        };
+        //gtk::Window::set_default_icon_name("icon-name-here");
+
+        Self { win, web_view, cfg, tb_buff, view, tx }
+    }
+
+    pub fn add_bookmark(
+            &mut self, name: &String, fldr: &String,
+            url: &String) -> Result<(), String> {
+        let mut fldr_ind: i64 = -1;
+        for i in 0..self.cfg.bookmarks.len() {
+            let folder = self.cfg.bookmarks[i].clone();
+            match folder.len() {
+                0 => {},
+                1 => {
+                    let bm = folder[0].clone();
+                    if bm[0] == name.clone() {
+                        return Err(format!(
+                            "Bookmark '{}' arleady exists!",
+                            name
+                        ));
+                    }
+                }, _ => {
+                    if folder[0][0].clone() == fldr.clone() {
+                        fldr_ind = i as i64; // Found folder to place it in
+                    }
+                    for j in 2..folder.len() {
+                        let bm = folder[j].clone();
+                        if bm[0] == name.clone() {
+                            return Err(format!(
+                                "Bookmark '{}' arleady exists!",
+                                name
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        if fldr.clone() != String::new() && fldr_ind != -1 {
+            return Err(format!("Folder '{}' does not exist!", fldr));
+        }
+        
+        if fldr_ind != -1 {
+            self.cfg.bookmarks[fldr_ind as usize].push(
+                vec![ name.clone(), url.clone() ]
+            );
+        } else {
+            self.cfg.bookmarks.push(vec! [
+                vec![ name.clone(), url.clone() ]
+            ]);
+        }
+
+        store(APP_NAME, &self.cfg).unwrap();
+        
+        self.win.remove(&self.view);
+        let (view, _web_view, _tb_buff) = AppState::rebuild_gui(
+            self.tx.clone(), &self.cfg.start_page, &self.cfg
+        );
+        self.win.add(&view);
+        self.win.show_all();
+
+        Ok(())
+    }
+
+    fn rebuild_gui(
+            tx: Sender<Event>, start_page: &String,
+            cfg: &AppConfig) -> (Box, WebView, EntryBuffer) {
         // Back button
         let back_btn = Button::with_label("←");
         back_btn.set_border_width(cfg.margin);
@@ -309,61 +497,7 @@ impl AppState {
             });
         });
 
-        // Generate book marks menu
-        let bookmark_menu = Menu::builder().build();
-        bookmark_menu.append(&AppState::create_add_bookmark_btn(tx.clone()));
-        for folder in cfg.bookmarks.clone() {
-            match folder.len() {
-                0 => { },
-                1 => {
-                    // Lots of clones bc closure expects static. Wouldn't touch
-                    let bm = folder[0].clone();
-                    let name = bm[0].clone();
-                    let bm_url = bm[0].clone();
-
-                    info!("Found local bookmark: {} -> '{}'.", name, bm_url);
-
-                    let item = AppState::create_bookmark_item(
-                        tx.clone(), &name, &bm_url
-                    );
-                    bookmark_menu.append(&item);
-                }, _ => {
-                    let fldr_name = folder[0][0].clone();
-                    let sub_menu = Menu::builder().build();
-
-                    for i in 1..folder.len() {
-                        let fldr_clone = folder.clone();
-                        let bookmark = fldr_clone[i].clone();
-
-                        let name = bookmark[0].clone();
-                        let bm_url = bookmark[1].clone();
-
-                        info!(
-                            "Found local bookmark: {}/{} -> '{}'.",
-                            fldr_name, name, bm_url
-                        );
-
-                        let item = AppState::create_bookmark_item(
-                            tx.clone(), &name, &bm_url
-                        );
-                        sub_menu.append(&item);
-                    }
-
-                    sub_menu.show_all();
-                    let item = cascade! {
-                        MenuItem::with_label(fldr_name.as_str());
-                            ..set_submenu(Some(&sub_menu));
-                    };
-                    bookmark_menu.append(&item);
-                }
-            }
-        }
-        bookmark_menu.show_all();
-        let bm_btn = cascade! {
-            MenuButton::builder().label("@").build();
-                ..set_border_width(cfg.margin);
-                ..set_popup(Some(&bookmark_menu));
-        };
+        let bm_btn = AppState::create_bookmark_btn(&cfg, tx.clone());
 
         let refr_tx = tx.clone();
         let refr_btn = cascade! {
@@ -452,25 +586,72 @@ impl AppState {
                 ..pack_start(&view_cont, false, false, 0);
                 ..pack_end(&web_box, true, true, cfg.margin);
         };
-        let win = cascade! {
-            Window::new(WindowType::Toplevel);
-                ..add(&view);
-                ..set_title(WIN_TITLE);
-                ..set_default_size(WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
-                ..connect_delete_event(move |_, _| {
-                    main_quit();
-                    Inhibit(false)
-                });
-                ..show_all();
-        };
-        //gtk::Window::set_default_icon_name("icon-name-here");
 
-        Self {
-            win,
-            web_view,
-            cfg,
-            tb_buff: buff
+        (view, web_view, buff)
+    }
+
+    // Generate book marks menu
+    fn create_bookmark_btn(cfg: &AppConfig, tx: Sender<Event>) -> MenuButton {
+        let bookmark_menu = Menu::builder().build();
+
+        bookmark_menu.append(&AppState::create_add_bookmark_btn(tx.clone()));
+        bookmark_menu.append(&AppState::create_add_folder_btn(tx.clone()));
+        bookmark_menu.append(&AppState::create_delete_bookmark_btn(tx.clone()));
+
+        for folder in cfg.bookmarks.clone() {
+            match folder.len() {
+                0 => { },
+                1 => {
+                    // Lots of clones bc closure expects static. Wouldn't touch
+                    let bm = folder[0].clone();
+                    let name = bm[0].clone();
+                    let bm_url = bm[0].clone();
+
+                    info!("Found local bookmark: {} -> '{}'.", name, bm_url);
+
+                    let item = AppState::create_bookmark_item(
+                        tx.clone(), &name, &bm_url
+                    );
+                    bookmark_menu.append(&item);
+                }, _ => {
+                    let fldr_name = folder[0][0].clone();
+                    let sub_menu = Menu::builder().build();
+
+                    for i in 2..folder.len() {
+                        let fldr_clone = folder.clone();
+                        let bookmark = fldr_clone[i].clone();
+
+                        let name = bookmark[0].clone();
+                        let bm_url = bookmark[1].clone();
+
+                        info!(
+                            "Found local bookmark: {}/{} -> '{}'.",
+                            fldr_name, name, bm_url
+                        );
+
+                        let item = AppState::create_bookmark_item(
+                            tx.clone(), &name, &bm_url
+                        );
+                        sub_menu.append(&item);
+                    }
+
+                    sub_menu.show_all();
+                    let item = cascade! {
+                        MenuItem::with_label(fldr_name.as_str());
+                            ..set_submenu(Some(&sub_menu));
+                    };
+                    bookmark_menu.append(&item);
+                }
+            }
         }
+        bookmark_menu.show_all();
+        let bm_btn = cascade! {
+            MenuButton::builder().label("@").build();
+                ..set_border_width(cfg.margin);
+                ..set_popup(Some(&bookmark_menu));
+        };
+
+        bm_btn
     }
 
     fn load_config() -> AppConfig {
@@ -518,12 +699,46 @@ impl AppState {
     fn create_add_bookmark_btn(tx: Sender<Event>) -> MenuItem {
         let item_tx = tx.clone();
         let item = cascade! {
-            MenuItem::with_label("Add Bookmark");
+            MenuItem::with_label("<Add Bookmark>");
                 ..connect_activate(move |_| {
                     let tx = item_tx.clone();
                     spawn(async move {
                         let _ = tx.send(Event {
                             tp: EventType::AddBookmark,
+                            url: String::new()
+                        }).await;
+                    });
+                });
+        };
+        item
+    }
+
+    fn create_add_folder_btn(tx: Sender<Event>) -> MenuItem {
+        let item_tx = tx.clone();
+        let item = cascade! {
+            MenuItem::with_label("<Add Bookmarks Folder>");
+                ..connect_activate(move |_| {
+                    let tx = item_tx.clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::AddBookmark,
+                            url: String::new()
+                        }).await;
+                    });
+                });
+        };
+        item
+    }
+
+    fn create_delete_bookmark_btn(tx: Sender<Event>) -> MenuItem {
+        let item_tx = tx.clone();
+        let item = cascade! {
+            MenuItem::with_label("<Delete Bookmark or Folder>");
+                ..connect_activate(move |_| {
+                    let tx = item_tx.clone();
+                    spawn(async move {
+                        let _ = tx.send(Event {
+                            tp: EventType::DeleteBookmarkOrFolder,
                             url: String::new()
                         }).await;
                     });
