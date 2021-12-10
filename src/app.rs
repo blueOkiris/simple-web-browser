@@ -4,7 +4,7 @@
  */
 
 use std::future::Future;
-use async_channel::{ unbounded, Sender, Receiver };
+use async_channel::{ unbounded, Sender };
 use gtk::{
     main_quit, Inhibit, init, main,
     Button, Box, Orientation, Entry, EntryBuffer, Grid, Dialog,
