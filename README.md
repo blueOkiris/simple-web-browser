@@ -7,6 +7,10 @@ A Web Browser should be a Web Browser and nothing more, and it should integrate 
 
 This project aims to be a simple GTK Web Browser that will support full website rendering, password/bookmark sync, and ad-block which are viewed as the essential functionality for modern web browsing.
 
+TODO:
+ - Finish bookmark management and sync
+ - Add password syncing
+
 ## Build
 
 Install Dependencies:
