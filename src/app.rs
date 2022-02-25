@@ -16,7 +16,9 @@ use gtk::{
         DialogExt, EntryExt
     }, glib::{ set_program_name, set_application_name, MainContext }
 };
-use webkit2gtk::{ WebView, LoadEvent, WebContext, traits::{ WebViewExt, WebContextExt } };
+use webkit2gtk::{
+    WebView, LoadEvent, WebContext, traits::{ WebViewExt, WebContextExt }
+};
 use serde::{ Serialize, Deserialize };
 use log::{ warn, error, info, debug };
 use confy::{ load, store };
@@ -261,7 +263,7 @@ pub fn start_browser() {
                         dialog: Some(bm_win.dialog)
                     })
                 }, EventType::AddFolder => {
-                    let bm_win = create_bookmark_add_dialog(
+                    let bm_win = create_folder_add_dialog(
                         app.cfg.margin, &(app.win.clone()),
                         &(app.tb_buff.text().clone())
                     );
@@ -747,7 +749,7 @@ impl AppState {
                     let tx = item_tx.clone();
                     spawn(async move {
                         let _ = tx.send(Event {
-                            tp: EventType::AddBookmark,
+                            tp: EventType::AddFolder,
                             url: String::new()
                         }).await;
                     });
