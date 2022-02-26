@@ -7,6 +7,13 @@ use gtk4::Box;
 
 const NAME: &'static str = "Swb Webkit";
 
+/* Unused plugin functions */
+
+#[no_mangle]
+pub fn on_navbar_load(_navbar: &Box) { }
+
+/* Used plugin functions */
+
 #[no_mangle]
 pub fn name() -> String {
     String::from(NAME)
@@ -14,25 +21,20 @@ pub fn name() -> String {
 
 #[no_mangle]
 pub fn on_back_btn_clicked() {
-    println!("Back called from {}", NAME);
+    // TODO: Navigate backwards
 }
 
 #[no_mangle]
 pub fn on_fwd_btn_clicked() {
-    println!("Forward called from {}", NAME);
+    // TODO: Navigate forward
 }
 
 #[no_mangle]
-pub fn on_change_page(url: &String) {
-    println!("Change page to {} called from {}", url, NAME);
+pub fn on_change_page(_url: &String) {
+    // TODO: Change page
 }
 
 #[no_mangle]
 pub fn on_refr_btn_clicked() {
-    println!("Refresh called from {}", NAME);
-}
-
-#[no_mangle]
-pub fn on_navbar_load(_navbar: &Box) {
-    println!("Navbar Load called from {}", NAME);
+    // TODO: Refresh
 }

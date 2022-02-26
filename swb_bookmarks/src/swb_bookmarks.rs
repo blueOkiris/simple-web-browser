@@ -17,29 +17,22 @@ const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
 const POPOVER_HEIGHT: i32 = 400;
 
+/* Unused plugin functions */
+
+#[no_mangle]
+pub fn on_back_btn_clicked() { }
+#[no_mangle]
+pub fn on_fwd_btn_clicked() { }
+#[no_mangle]
+pub fn on_change_page(_url: &String) { }
+#[no_mangle]
+pub fn on_refr_btn_clicked() { }
+
+/* Used plugin functions */
+
 #[no_mangle]
 pub fn name() -> String {
     String::from(NAME)
-}
-
-#[no_mangle]
-pub fn on_back_btn_clicked() {
-    println!("Back called from {}", NAME);
-}
-
-#[no_mangle]
-pub fn on_fwd_btn_clicked() {
-    println!("Forward called from {}", NAME);
-}
-
-#[no_mangle]
-pub fn on_change_page(url: &String) {
-    println!("Change page to {} called from {}", url, NAME);
-}
-
-#[no_mangle]
-pub fn on_refr_btn_clicked() {
-    println!("Refresh called from {}", NAME);
 }
 
 #[no_mangle]
@@ -65,9 +58,12 @@ fn create_sync_menu() -> MenuButton {
         .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
         .child(&menu_content)
         .build();
-    let menu = Popover::builder().autohide(true).child(&menu_scroller).build();
+    let menu = Popover::builder()
+        .width_request(POPOVER_WIDTH).height_request(POPOVER_HEIGHT)
+        .autohide(true).child(&menu_scroller)
+        .build();
 
-    // TODO: Add control interface
+    // TODO: Add control interface dependent on whether synced in or not
 
     let sync_menu = MenuButton::builder()
         .label("⇅").margin_start(DEF_MARGIN)
