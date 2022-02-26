@@ -35,8 +35,7 @@ Want to switch to a completely different browser engine? Be my guest!
 
 The default system will use:
 - Custom password and bookmark sync
-- Custom adblock gtk
-- Webkit GTK
+- Custom adblock combined into a plugin with Webkit Gtk
 
 The actual main window contains:
 - a container for the web page rendering
@@ -44,5 +43,6 @@ The actual main window contains:
 - a search bar
 - a refresh button
 - a bookmarks menu including a folders system
+- a sync menu for loggin in/logging out
 
 Events from the main window like searching or creating a bookmark call plugins to do the dirty work. To see what the plugin supports, look in `core/src/plugin.rs`
