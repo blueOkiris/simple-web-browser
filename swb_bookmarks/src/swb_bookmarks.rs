@@ -5,7 +5,7 @@
 
 use gtk4::{
     MenuButton, Box, ArrowType, Popover, ScrolledWindow, Button,
-    Orientation,
+    Orientation, Frame,
     prelude::{
         BoxExt, ButtonExt
     }
@@ -15,7 +15,7 @@ use cascade::cascade;
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const POPOVER_HEIGHT: i32 = 500;
+const POPOVER_HEIGHT: i32 = 400;
 
 #[no_mangle]
 pub fn name() -> String {
@@ -85,30 +85,33 @@ fn create_bm_menu() -> MenuButton {
         Box::builder()
             .orientation(Orientation::Vertical)
             .hexpand(true).vexpand(true)
+            .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
             .build();
     };
-    let menu_scroller = ScrolledWindow::builder()
-        .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
-        .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
-        .hexpand(true).vexpand(true)
-        .child(&menu_content)
-        .build();
     let menu = Popover::builder()
         .hexpand(true).vexpand(true)
         .width_request(POPOVER_WIDTH).height_request(POPOVER_HEIGHT)
-        .child(&menu_scroller)
+        .child(&menu_content)
         .build();
 
     // TODO: Load and add bookmarks data to bm menu
     let bm_box = Box::builder()
         .hexpand(true).vexpand(true).orientation(Orientation::Vertical)
         .build();
-    menu_content.append(&bm_box);
+    let bm_scroller = ScrolledWindow::builder()
+        .hexpand(true).vexpand(true)
+        .child(&bm_box)
+        .build();
+    let bm_frame = Frame::builder()
+        .label("Bookmarks:").hexpand(true).vexpand(true)
+        .child(&bm_scroller)
+        .build();
+    menu_content.append(&bm_frame);
 
-    // TODO: Add the control buttons
     let add_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("< Add Bookmark >")
+            .label("Add Bookmark")
             .margin_top(DEF_MARGIN).margin_bottom(DEF_MARGIN)
             .build();
             ..connect_clicked(move |_btn| {
@@ -119,7 +122,7 @@ fn create_bm_menu() -> MenuButton {
 
     let edit_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("< Edit Bookmark >")
+            .label("Edit Bookmark")
             .margin_bottom(DEF_MARGIN)
             .build();
             ..connect_clicked(move |_btn| {
@@ -130,7 +133,7 @@ fn create_bm_menu() -> MenuButton {
 
     let add_fldr_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("< Add Folder >")
+            .label("Add Folder")
             .margin_bottom(DEF_MARGIN)
             .build();
             ..connect_clicked(move |_btn| {
@@ -141,8 +144,7 @@ fn create_bm_menu() -> MenuButton {
 
     let rm_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("< Remove Item >")
-            .margin_bottom(DEF_MARGIN)
+            .label("Remove Item")
             .build();
             ..connect_clicked(move |_btn| {
                 // TODO: Remove bookmark or folder
