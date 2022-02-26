@@ -18,7 +18,7 @@ Goals:
 
 Install Dependencies:
 - cargo
-- libgtk4
+- libgtk3
 - Linux
 
 If not installing the package, run `cargo run`
