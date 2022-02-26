@@ -4,8 +4,8 @@ version = "22.225.1"
 edition = "2021"
 
 [dependencies]
-tauri-webkit2gtk = "0.14.0"
-gtk4 = "0.4.6"
+webkit2gtk = "0.17.1"
+gtk = "0.15.4"
 
 [lib]
 name = "swb_webkit"

@@ -11,7 +11,7 @@ use dlopen_derive::WrapperApi;
 use dlopen::wrapper::{
     Container, WrapperApi
 };
-use gtk4::Box;
+use gtk::Box;
 
 #[cfg(debug_assertions)]
 const PLUGIN_DIR: &'static str = "target/debug";
@@ -27,7 +27,8 @@ pub struct Plugin {
     on_fwd_btn_clicked: extern fn(),
     on_change_page: extern fn(url: &String),
     on_refr_btn_clicked: extern fn(),
-    on_navbar_load: extern fn(navbar: &Box)
+    on_navbar_load: extern fn(navbar: &Box),
+    on_window_content_load: extern fn(content: &Box)
 }
 
 pub fn load_plugins() -> Vec<Arc<Container<Plugin>>> {

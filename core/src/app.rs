@@ -7,13 +7,13 @@ use std::{
     env::set_var,
     sync::Arc
 };
-use gtk4::{
+use gtk::{
     Application, ApplicationWindow,
     Button, Box, EntryBuffer, Entry,
     Orientation, Align,
     prelude::{
-        ApplicationExt, ApplicationExtManual, GtkWindowExt, WidgetExt,
-        BoxExt, ButtonExt, EntryExt, EditableExt
+        ApplicationExt, ApplicationExtManual, WidgetExt,
+        ButtonExt, EntryExt, ContainerExt
     }
 };
 use cascade::cascade;
@@ -61,7 +61,7 @@ impl App {
 
             Self::create_gui(&win, &plugins);
 
-            win.show();
+            win.show_all();
         });
 
         gtk_app.run();
@@ -82,8 +82,12 @@ impl App {
                 .margin_top(DEF_MARGIN).margin_bottom(DEF_MARGIN)
                 .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
                 .build();
-                ..append(&navbar);
+                ..add(&navbar);
         };
+
+        for plugin in plugins {
+            plugin.on_window_content_load(&view.clone());
+        }
 
         win.set_child(Some(&view));
     }
@@ -142,10 +146,10 @@ impl App {
                 .orientation(Orientation::Horizontal)
                 .margin_bottom(DEF_MARGIN) // margin to web view
                 .hexpand(true).vexpand(false).build();
-                ..append(&back_btn);
-                ..append(&fwd_btn);
-                ..append(&search);
-                ..append(&refr_btn);
+                ..add(&back_btn);
+                ..add(&fwd_btn);
+                ..add(&search);
+                ..add(&refr_btn);
         };
 
         for plugin in plugins {
