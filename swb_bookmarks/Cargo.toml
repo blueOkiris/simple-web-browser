@@ -1,13 +1,13 @@
 [package]
-name = "swb_webkit"
+name = "swb_bookmarks"
 version = "22.225.1"
 edition = "2021"
 
 [dependencies]
-tauri-webkit2gtk = "0.14.0"
 gtk4 = "0.4.6"
+cascade = "1.0.0"
 
 [lib]
-name = "swb_webkit"
+name = "swb_bookmarks"
 crate-type = [ "cdylib" ]
-path = "src/swb_webkit.rs"
+path = "src/swb_bookmarks.rs"

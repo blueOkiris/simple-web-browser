@@ -9,4 +9,6 @@ path = "src/main.rs"
 
 [dependencies]
 gtk4 = "0.4.6"
-libloading = "0.7.3"
+cascade = "1.0.0"
+dlopen = "0.1.8"
+dlopen_derive = "0.1.4"

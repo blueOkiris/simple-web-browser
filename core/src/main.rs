@@ -4,7 +4,6 @@
  */
 
 mod app;
-mod event;
 mod plugin;
 
 use app::App;

@@ -3,8 +3,15 @@
  * Description: Define an interface for creating plugins
  */
 
-use std::fs::read_dir;
-use libloading::{ Library, Symbol, Error };
+use std::{
+    fs::read_dir,
+    sync::Arc
+};
+use dlopen_derive::WrapperApi;
+use dlopen::wrapper::{
+    Container, WrapperApi
+};
+use gtk4::Box;
 
 #[cfg(debug_assertions)]
 const PLUGIN_DIR: &'static str = "target/debug";
@@ -13,74 +20,34 @@ const PLUGIN_DIR: &'static str = "target/debug";
 #[cfg(not(debug_assertions))]
 const PLUGIN_DIR: &'static str = "plugins";
 
-/*
- * This is the main thing right here!
- * If you want to make a plugin, it has to implement all of these methods
- * even if it chooses to do nothing in them
- * 
- * If it's missing a plugin, default behavior (usually nothing) is used
- * This means updates adding functions won't break your plugin
- * That is EXCEPT for "name" which MUST exist. It's a 
- */
-
-type NameProducer = unsafe fn(&mut String);
-
+#[derive(WrapperApi)]
 pub struct Plugin {
-    lib: Library,
-    name: String
+    name: extern fn() -> String,
+    on_back_btn_clicked: extern fn(),
+    on_fwd_btn_clicked: extern fn(),
+    on_change_page: extern fn(url: &String),
+    on_refr_btn_clicked: extern fn(),
+    on_navbar_load: extern fn(navbar: &Box)
 }
 
-impl Plugin {
-    pub fn new(fname: String) -> Self {
-        let lib = unsafe { Library::new(fname.clone()).unwrap() };
+pub fn load_plugins() -> Vec<Arc<Container<Plugin>>> {
+    let mut plugins = Vec::new();
 
-        let mut name: String = String::new();
-        let get_name_func: Result<Symbol<NameProducer>, Error> = unsafe {
-            lib.get(b"name")
-        };
-        match get_name_func {
-            Err(err) => {
-                name = fname.clone();
-                println!("Error calling name() in {}: {}", fname.clone(), err);
-            }, Ok(get_name) => unsafe { get_name(&mut name) }
+    let paths = read_dir(PLUGIN_DIR).unwrap();
+    for path in paths {
+        let fname = path.unwrap().path().display().to_string();
+        if fname.ends_with(".so") {
+            let plugin: Container<Plugin> = unsafe {
+                Container::load(fname.clone())
+            }.expect(
+                (String::from("Error loading plugin from {}") + &fname.clone())
+                    .as_str()
+            );
+
+            println!("Found plugin '{}' in {}", plugin.name(), fname.clone());
+            plugins.push(Arc::new(plugin));
         }
-
-        Self { lib, name }
     }
 
-    pub fn from_folder() -> Vec<Plugin> {
-        let mut libs = Vec::new();
-
-        let paths = read_dir(PLUGIN_DIR).unwrap();
-        for path in paths {
-            let fname = path.unwrap().path().display().to_string();
-            if fname.ends_with(".so") {
-                println!("Found plugin: {}", fname);
-                let plugin = Plugin::new(fname);
-                libs.push(plugin);
-            }
-        }
-
-        libs
-    }
-
-    // TODO: Create plugin functions
-
-    // Call the name() function instead of using the property
-    pub fn call_name(self) -> String {
-        let mut name: String = String::new();
-        let get_name_func: Result<Symbol<NameProducer>, Error> = unsafe {
-            self.lib.get(b"name")
-        };
-        match get_name_func {
-            Err(err) => {
-                name = self.name.clone();
-                println!(
-                    "Error calling name() in {}: {}",
-                    self.name.clone(), err
-                );
-            }, Ok(get_name) => unsafe { get_name(&mut name) }
-        }
-        name
-    }
+    plugins
 }
