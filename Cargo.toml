@@ -1,20 +1,2 @@
-[package]
-name = "swb"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-gtk = "0.14.3"
-webkit2gtk = "0.15"
-confy = "0.4.0"
-serde = { version = "1.0", features = [ "derive" ] }
-log = "0.4.14"
-log4rs = "1.0.0"
-async-channel = "1.6.1"
-cascade = "1.0.0"
-mongodb = "2.0.0"
-tokio = "1.14.0"
-reqwest = "0.11.7"
-rand = "0.8.4"
+[workspace]
+members = [ "core", "swb_webkit" ]

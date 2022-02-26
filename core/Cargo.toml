@@ -1,0 +1,12 @@
+[package]
+name = "simple-web-browser"
+version = "22.225.1"
+edition = "2021"
+
+[[bin]]
+name = "swb"
+path = "src/main.rs"
+
+[dependencies]
+gtk4 = "0.4.6"
+libloading = "0.7.3"

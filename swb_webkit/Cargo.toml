@@ -1,0 +1,12 @@
+[package]
+name = "swb_webkit"
+version = "22.225.1"
+edition = "2021"
+
+[dependencies]
+tauri-webkit2gtk = "0.14.0"
+
+[lib]
+name = "swb_webkit"
+crate-type = ["cdylib"]
+path = "src/swb_webkit.rs"
