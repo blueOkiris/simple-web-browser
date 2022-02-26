@@ -20,7 +20,7 @@ use crate::{
     plugin::Plugin
 };
 
-const APP_ID: &'static str = "com.blueokiris.Clonger";
+const APP_ID: &'static str = "com.blueokiris.swb";
 const GSK_RENDERER: &'static str = "cairo";
 const WIN_MIN_WIDTH: i32 = 300;
 const WIN_MIN_HEIGHT: i32 = 300;
