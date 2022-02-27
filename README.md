@@ -1,5 +1,7 @@
 # SWB (Simple Web Browser)
 
+![Screenshot of Simple Web Browser on i3 (i.e. no menu bar)](./screenshot.png)
+
 ## Description
 
 Pronounced as "swub" /swʌb/
