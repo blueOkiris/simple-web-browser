@@ -18,7 +18,7 @@ const PLUGIN_DIR: &'static str = "target/debug";
 
 // When building the final app, we'll create a "plugins" folder in install dir
 #[cfg(not(debug_assertions))]
-const PLUGIN_DIR: &'static str = "plugins";
+const PLUGIN_DIR: &'static str = "/opt/swb/plugins";
 
 #[derive(WrapperApi)]
 pub struct Plugin {

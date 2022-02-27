@@ -18,7 +18,7 @@ Goals:
 
 Obviously, all this will be handled by the package, but if you're building from source, this is what you've gotta do.
 
-Install Dependencies:
+First, install Dependencies:
 - cargo
 - [adblock-rust-server](https://github.com/dudik/blockit)
   + Note #1: Recommended to add "https://easylist-downloads.adblockplus.org/easylist_min_content_blocker.json" to ~/.config/ars/urls
@@ -26,7 +26,16 @@ Install Dependencies:
 - libgtk3
 - Linux
 
-Run `cargo run`
+To simply try it out, from the repo folder, run `cargo run`
+
+If you want to install it somewhere:
+- Build with `cargo build --release`
+- Copy the binary "swb" from target to the install location, /opt/swb/
+- Create a plugins/ folder in the install location and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
+- Copy your adblock/ folder containing the blockit.so file into that folder as well
+- Create whatever soft link you want to the binary and any .desktop file you want
+
+Again, once the package is made, it will do all that jazz for you
 
 ## Architecture
 
