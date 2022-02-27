@@ -138,7 +138,7 @@ impl App {
         let refr_plugins = plugins.clone();
         let refr_btn = cascade! {
             Button::builder()
-                .label("↺").margin_end(DEF_MARGIN) // margin to next btn
+                .label("↺")
                 .tooltip_text("Refresh Page")
                 .build();
                 ..connect_clicked(move |_btn| {
