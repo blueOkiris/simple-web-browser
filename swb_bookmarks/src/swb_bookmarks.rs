@@ -3,6 +3,9 @@
  * Description: Browser plugin for swb that uses Webkit Gtk
  */
 
+mod sync;
+mod config;
+
 use gtk::{
     MenuButton, Box, ArrowType, Popover, ScrolledWindow, Button,
     Orientation, Frame,
@@ -11,6 +14,7 @@ use gtk::{
     }
 };
 use cascade::cascade;
+use crate::config::Config;
 
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
@@ -83,7 +87,13 @@ fn create_sync_menu() -> MenuButton {
         .popover(&menu)
         .build();
     sync_menu.connect_clicked(|_btn| {
-        // TODO: Add control interface for login/logout to bm_box
+        let cfg = Config::get_global();
+        if cfg.stay_logged_in {
+            // TODO: Try log in and show sign out button instead
+            return;
+        }
+        
+        // TODO: Set up menu for login/register
     });
 
     sync_menu
