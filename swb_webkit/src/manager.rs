@@ -6,6 +6,7 @@
  *    everything
  */
 
+use gtk::Box;
 use webkit2gtk::{
     WebView, LoadEvent,
     Error,
@@ -17,6 +18,7 @@ const NO_INTERNET_MSG: &'static str = "Temporary failure in name resolution";
 
 pub static mut WEB_VIEW_MANAGER: WebViewManager = WebViewManager {
     web_view: None,
+    view_parent: None,
     history: Vec::new(),
     curr_page: 0,
     internal_navigation: false
@@ -24,18 +26,20 @@ pub static mut WEB_VIEW_MANAGER: WebViewManager = WebViewManager {
 
 pub struct WebViewManager {
     pub web_view: Option<WebView>,
+    pub view_parent: Option<Box>,
     pub history: Vec<String>,
     pub curr_page: usize,
     pub internal_navigation: bool
 }
 
 impl WebViewManager {
-    pub fn new(web_view: WebView) -> Self {
+    pub fn new(web_view: WebView, view_parent: Box) -> Self {
         web_view.connect_load_changed(Self::web_view_load_change);
         web_view.connect_load_failed(Self::web_view_load_failed);
 
         Self {
             web_view: Some(web_view),
+            view_parent: Some(view_parent),
             history: Vec::new(),
             curr_page: 0,
             internal_navigation: false
@@ -111,5 +115,12 @@ impl WebViewManager {
         self.curr_page += 1;
         self.internal_navigation = true;
         self.web_view.clone().unwrap().load_uri(url);
+    }
+
+    pub fn refresh(&mut self) {
+        self.internal_navigation = true;
+        self.web_view.clone().unwrap().load_uri(
+            &WebView::uri(&self.web_view.clone().unwrap()).unwrap().to_string()
+        );
     }
 }

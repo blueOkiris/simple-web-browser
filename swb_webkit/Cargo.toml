@@ -4,7 +4,7 @@ version = "22.225.1"
 edition = "2021"
 
 [dependencies]
-webkit2gtk = "0.17.1"
+webkit2gtk = { version = "0.17.1", features = [ "v2_16" ] }
 gtk = "0.15.4"
 
 [lib]

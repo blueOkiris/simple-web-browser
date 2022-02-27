@@ -55,9 +55,9 @@ impl App {
                 .application(app)
                 .title(WIN_TITLE)
                 .default_width(WIN_DEF_WIDTH).default_height(WIN_DEF_HEIGHT)
+                .width_request(WIN_MIN_WIDTH).height_request(WIN_MIN_HEIGHT)
                 .can_focus(true)
                 .build();
-            win.set_size_request(WIN_MIN_WIDTH, WIN_MIN_HEIGHT);
 
             Self::create_gui(&win, &plugins);
 

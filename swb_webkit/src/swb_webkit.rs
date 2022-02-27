@@ -12,9 +12,9 @@ use webkit2gtk::{
     }
 };
 use gtk::{
-    Box, Button,
+    Box, ToggleButton, Button,
     prelude::{
-        ContainerExt, BoxExt, ButtonExt
+        ContainerExt, BoxExt, ButtonExt, ToggleButtonExt, WidgetExt
     }
 };
 use crate::manager::{
@@ -47,7 +47,9 @@ pub fn on_window_content_load(content: &Box) {
 
     // Set up global data
     unsafe {
-        WEB_VIEW_MANAGER = WebViewManager::new(web_view.clone());
+        WEB_VIEW_MANAGER = WebViewManager::new(
+            web_view.clone(), content.clone()
+        );
     }
 }
 
@@ -74,14 +76,57 @@ pub fn on_change_page(url: &String) {
 
 #[no_mangle]
 pub fn on_refr_btn_clicked() {
-    // TODO: Refresh
+    unsafe {
+        WEB_VIEW_MANAGER.refresh();
+    }
 }
 
-// Adblock settings manager
+// Adblock settings manager and private mode
 #[no_mangle]
 pub fn on_navbar_load(navbar: &Box) {
+    let private_btn = create_private_button();
+    navbar.add(&private_btn);
+
     let settings_mgr = create_settings_manager();
     navbar.add(&settings_mgr);
+}
+
+fn create_private_button() -> ToggleButton {
+    let private_btn = ToggleButton::builder()
+        .label("(¬■_■)").margin_start(DEF_MARGIN)
+        .build();
+    private_btn.connect_toggled(move |toggle| {
+        // Reset with a new web view (REQUIRED by webkit2gtk)
+
+        // Enable adblock
+        let web_ctx = WebContext::builder().build();
+        web_ctx.set_web_extensions_directory(ADBLOCK_EXTENSION_DIR);
+
+        // Create the view
+        let web_view = WebView::builder()
+            .is_ephemeral(toggle.is_active()).web_context(&web_ctx)
+            .build();
+        web_view.load_uri(START_PAGE);
+
+        // Get parent and replace old web view with the new one
+        let content = unsafe {
+            WEB_VIEW_MANAGER.view_parent.clone().unwrap()
+        };
+        let old_web_view = unsafe {
+            WEB_VIEW_MANAGER.web_view.clone().unwrap()
+        };
+        content.remove(&old_web_view);
+        content.pack_start(&web_view.clone(), true, true, 0);
+        content.show_all();
+
+        // Set up global data
+        unsafe {
+            WEB_VIEW_MANAGER = WebViewManager::new(
+                web_view.clone(), content.clone()
+            );
+        }
+    });
+    private_btn
 }
 
 fn create_settings_manager() -> Button {
