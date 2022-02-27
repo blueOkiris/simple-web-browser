@@ -16,6 +16,8 @@ Goals:
 
 ## Build
 
+Obviously, all this will be handled by the package, but if you're building from source, this is what you've gotta do.
+
 Install Dependencies:
 - cargo
 - [adblock-rust-server](https://github.com/dudik/blockit)
@@ -24,7 +26,7 @@ Install Dependencies:
 - libgtk3
 - Linux
 
-If not installing the package, run `cargo run`
+Run `cargo run`
 
 ## Architecture
 
