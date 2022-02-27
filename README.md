@@ -18,6 +18,8 @@ Goals:
 
 Install Dependencies:
 - cargo
+- [adblock-rust-server](https://github.com/dudik/blockit)
+  + Note #2: the directory to place it in is: `adblock/`, so do the `sudo ln -s` to that location
 - libgtk3
 - Linux
 
@@ -35,7 +37,7 @@ Want to switch to a completely different browser engine? Be my guest!
 
 The default system will use:
 - Custom password and bookmark sync
-- Custom adblock combined into a plugin with Webkit Gtk
+- Blockit adblocker combined into a plugin with Webkit Gtk
 
 The actual main window contains:
 - a container for the web page rendering
