@@ -8,19 +8,27 @@ mod config;
 
 use gtk::{
     MenuButton, Box, Popover, ScrolledWindow, Frame,
-    Entry, Label, CheckButton, Button,
-    Orientation, ArrowType, Align, InputPurpose,
+    Entry, Label, CheckButton, Button, Dialog, TextView, TextBuffer,
+    Orientation, ArrowType, Align, ResponseType,
     prelude::{
-        ContainerExt, ButtonExt, WidgetExt, BoxExt,
-    }, traits::MenuButtonExt
+        ContainerExt, ButtonExt, WidgetExt, BoxExt, EntryExt, DialogExt,
+        GtkWindowExt, MenuButtonExt
+    }, traits::ToggleButtonExt 
 };
 use cascade::cascade;
-use crate::config::Config;
+use crate::{
+    config::Config,
+    sync::{
+        login, register
+    }
+};
 
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
 const POPOVER_HEIGHT: i32 = 200;
+const POPUP_WIDTH: i32 = 250;
+const POPUP_HEIGHT: i32 = 100;
 
 /* Unused plugin functions */
 
@@ -93,10 +101,19 @@ fn create_sync_menu() -> MenuButton {
             bm_box.remove(&child);
         }
 
+        // Could clean up to reuse code, but it's not too bad rn
         let cfg = Config::get_global();
-        if cfg.stay_logged_in {
-            // TODO: Try log in first
-            // if login succeeded {
+        if cfg.logged_in || cfg.stay_logged_in {
+            let mut logged_in = cfg.logged_in;
+            if !logged_in {
+                // Try to log in
+                let email = cfg.email;
+                let pword = cfg.pword;
+                let log_res = login(&email, &pword);
+                logged_in = log_res.is_ok()
+            }
+
+            if logged_in {
                 let log_out_btn = Button::builder()
                     .label("Sign Out")
                     .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
@@ -106,15 +123,21 @@ fn create_sync_menu() -> MenuButton {
 
                 let menu_btn_clone = menu_btn.clone();
                 log_out_btn.connect_clicked(move |_btn| {
+                    let mut cfg = Config::get_global();
+                    cfg.logged_in = false;
+                    cfg.stay_logged_in = false;
+                    Config::set_global(cfg);
+                    // Don't store here as this is temp sign out
                     menu_btn_clone.popover().unwrap().hide();
                 });
 
                 bm_box.pack_start(&log_out_btn, true, true, 0);
                 bm_box.show_all();
+
                 return;
-            //}
+            }
         }
-        
+
         let email_hbox = Box::builder()
             .orientation(Orientation::Horizontal)
             .hexpand(true).margin_bottom(DEF_MARGIN)
@@ -143,7 +166,7 @@ fn create_sync_menu() -> MenuButton {
         bm_box.pack_start(&pword_hbox, false, false, 0);
 
         let remember = CheckButton::builder()
-            .label("Stay logged in:").margin_bottom(DEF_MARGIN)
+            .label("Stay logged in").margin_bottom(DEF_MARGIN)
             .hexpand(true).halign(Align::Center)
             .build();
         bm_box.pack_start(&remember, false, false, 0);
@@ -161,11 +184,168 @@ fn create_sync_menu() -> MenuButton {
         btn_box.pack_start(&login_btn, true, true, 0);
         bm_box.pack_start(&btn_box, false, false, 0);
 
+        // Handle login/registration
+        let reg_email = email.clone();
+        let reg_pword = pword.clone();
+        let reg_remem = remember.clone();
         reg_btn.connect_clicked(move |_btn| {
-            // TODO: Attempt to register
+            let email_txt = reg_email.text().to_ascii_lowercase();
+            let pword_txt = reg_pword.text().to_string();
+            let reg_res = register(&email_txt, &pword_txt);
+            match reg_res {
+                Err(err) => {
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Error")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text(&err.to_string())
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(|mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide()
+                        }
+                    });
+                    dialog.show_all();
+                }, Ok(()) => {
+                    // Show message confirming registration
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Success")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text("Succesfully registered user")
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(move |mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide();
+                        }
+                    });
+                    dialog.show_all();
+
+                    // Save hashed password locally in config
+                    if reg_remem.is_active() {
+                        let mut cfg = Config::get_global();
+                        cfg.stay_logged_in = true;
+                        cfg.email = email_txt.clone();
+                        cfg.pword = pword_txt.clone();
+                        Config::set_global(cfg);
+                        Config::store_global();
+                    }
+                }
+            }
         });
+        let log_email = email.clone();
+        let log_pword = pword.clone();
+        let log_remem = remember.clone();
+        let log_menu_clone = menu.clone();
         login_btn.connect_clicked(move |_btn| {
-            // TODO: Attempt to login
+            let email_txt = log_email.text().to_ascii_lowercase();
+            let pword_txt = log_pword.text().to_string();
+            let log_res = login(&email_txt, &pword_txt);
+            match log_res {
+                Err(err) => {
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Error")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text(&err.to_string())
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(|mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide()
+                        }
+                    });
+                    dialog.show_all();
+                }, Ok(()) => {
+                    // Show message confirming registration
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Success")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text("Succesfully logged user in")
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(move |mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide();
+                        }
+                    });
+                    dialog.show_all();
+
+                    let mut cfg = Config::get_global();
+
+                    // Save hashed password locally in config
+                    if log_remem.is_active() {
+                        cfg.stay_logged_in = true;
+                        cfg.email = email_txt.clone();
+                        cfg.pword = pword_txt.clone();
+                    }
+
+                    cfg.logged_in = true;
+                    Config::set_global(cfg);
+                    Config::store_global();
+
+                    log_menu_clone.hide();
+                }
+            }
         });
 
         bm_box.show_all();

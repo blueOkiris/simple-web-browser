@@ -3,16 +3,149 @@
  * Description: State and functions for logging in or already being logged in
  */
 
-pub static mut LOGIN_MANAGER: LoginManager = LoginManager {
-    synced: false
+use std::{
+    hash::{
+        Hash, Hasher
+    }, collections::hash_map::DefaultHasher,
+    error::Error
 };
+use mongodb::{
+    Client, Collection,
+    bson::doc
+};
+use serde::{
+    Serialize, Deserialize
+};
+use rand::{
+    Rng, thread_rng
+};
+use tokio::runtime::Runtime;
+use reqwest::get;
 
-pub struct LoginManager {
-    synced: bool
+const DB_LOGIN: &'static str =
+    "mongodb://simple_web_browser:password@blueokiris.com:27017";
+const SALT_LEN: usize = 64;
+
+#[derive(Serialize, Deserialize)]
+struct User {
+    email: String,
+    pword_salt: String,
+    pword_hash: String
 }
 
-impl LoginManager {
-    pub fn login(&mut self) {
-        
+pub fn register(
+        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+    // Mongo is async, but we don't want that, so we wait for it to finish
+    let runtime = Runtime::new().unwrap();
+    let fut = register_async(email_txt, pword_txt);
+    runtime.block_on(fut)
+}
+
+pub fn login(
+        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+    let runtime = Runtime::new().unwrap();
+    let fut = login_async(email_txt, pword_txt);
+    runtime.block_on(fut)
+}
+
+async fn login_async(
+        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+    let client = Client::with_uri_str(DB_LOGIN).await?;
+    let bm_db = client.database("bookmarks");
+    let users: Collection<User> = bm_db.collection("users");
+
+    let filter = doc! {
+        "email": email_txt
+    };
+    let result = users.find_one(filter, None).await?;
+
+    let user = match result {
+        Some(ref u) => u,
+
+        // Give generic answer for security!
+        None => Err("Incorrect email/password combo.")?
+    };
+
+    let salt_and_pass = user.pword_salt.clone() + pword_txt;
+    let test_hash = get_hash(&salt_and_pass);
+
+    if test_hash == user.pword_hash {
+        Ok(())
+    } else {
+        Err("Incorrect email/password combo.")?
     }
+}
+
+async fn register_async(
+        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+    assert_valid_email(email_txt).await?;
+
+    let client = Client::with_uri_str(DB_LOGIN).await?;
+    let bm_db = client.database("bookmarks");
+    let users: Collection<User> = bm_db.collection("users");
+
+    assert_unused_email(email_txt, &users).await?;
+
+    let salt = get_random_salt();
+    let salt_and_pass = salt.clone() + pword_txt;
+    let hash = get_hash(&salt_and_pass.to_string());
+
+    let new_user = User {
+        email: email_txt.clone(),
+        pword_salt: salt,
+        pword_hash: hash
+    };
+    users.insert_one(new_user, None).await?;
+
+    Ok(())
+}
+
+// Check that email is real
+async fn assert_valid_email(email_txt: &String) -> Result<(), Box<dyn Error>> {
+    let request_url = format!(
+        "https://isitarealemail.com/api/email/validate?email={}",
+        email_txt
+    );
+    let result = get(&request_url).await?.text().await?;
+
+    if result == String::from("{\"status\":\"valid\"}") {
+        Ok(())
+    } else {
+        Err(format!("Email '{}' is invalid.", email_txt).to_owned())?
+    }
+}
+
+// Check that the user doesn't already have an account
+async fn assert_unused_email(
+        email_txt: &String,
+        users: &Collection<User>) -> Result<(), Box<dyn Error>> {
+    let filter = doc!{
+        "email": email_txt
+    };
+    let result = users.find_one(filter, None).await?;
+    match result {
+        Some(_err) => Err(
+            format!("Email '{}' already in use.", email_txt).to_owned()
+        )?, None => Ok(())
+    }
+}
+
+fn get_hash(msg: &String) -> String {
+    let mut hasher = DefaultHasher::new();
+    msg.hash(&mut hasher);
+    let num = hasher.finish();
+    format!("{:x}", num)
+}
+
+fn get_random_salt() -> String {
+    let mut hash_str = String::new();
+
+    let mut rng = thread_rng();
+    for _n in 0..SALT_LEN {
+        let digit = rng.gen_range(0..10);
+        let random_str = format!("{}", digit);
+        hash_str += &random_str;
+    }
+
+    hash_str
 }

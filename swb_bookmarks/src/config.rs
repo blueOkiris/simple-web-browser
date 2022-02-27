@@ -12,15 +12,21 @@ use confy::{
 
 static mut CONFIG: Option<Config> = None;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
-    pub stay_logged_in: bool
+    pub stay_logged_in: bool,
+    pub email: String,
+    pub pword: String,
+    pub logged_in: bool
 }
 
 impl Default for Config {
     fn default() -> Config {
         Config {
-            stay_logged_in: false
+            stay_logged_in: false,
+            email: String::new(),
+            pword: String::new(),
+            logged_in: false
         }
     }
 }
@@ -30,9 +36,11 @@ impl Config {
         unsafe {
             if CONFIG.is_none() {
                 match load("SWB_BOOKMARKS") {
-                    Err(_err) => {
-                        println!("Error in config! Using defaults.");
-                        CONFIG = Some(Config::default())
+                    Err(err) => {
+                        println!("Error '{}' in config! Using defaults.", err);
+                        CONFIG = Some(Config::default());
+                        store("SWB_BOOKMARKS", CONFIG.clone().unwrap())
+                            .unwrap();
                     }, Ok(config) => CONFIG = Some(config)
                 }
             }
@@ -49,7 +57,9 @@ impl Config {
 
     pub fn store_global() {
         unsafe {
-            store("SWB_BOOKMARKS", CONFIG.clone().unwrap()).unwrap();
+            let mut cfg = CONFIG.clone().unwrap();
+            cfg.logged_in = false; // Never log in by default
+            store("SWB_BOOKMARKS", cfg).unwrap();
         }
     }
 }
