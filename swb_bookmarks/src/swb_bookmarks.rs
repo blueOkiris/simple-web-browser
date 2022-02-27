@@ -7,10 +7,11 @@ mod sync;
 mod config;
 
 use gtk::{
-    MenuButton, Box, ArrowType, Popover, ScrolledWindow, Button,
-    Orientation, Frame,
+    MenuButton, Box, Popover, ScrolledWindow, Frame,
+    Entry, Label, CheckButton, Button,
+    Orientation, ArrowType, Align, InputPurpose,
     prelude::{
-        ContainerExt, ButtonExt, WidgetExt
+        ContainerExt, ButtonExt, WidgetExt, BoxExt,
     }
 };
 use cascade::cascade;
@@ -19,7 +20,7 @@ use crate::config::Config;
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const POPOVER_HEIGHT: i32 = 400;
+const POPOVER_HEIGHT: i32 = 200;
 
 /* Unused plugin functions */
 
@@ -86,14 +87,71 @@ fn create_sync_menu() -> MenuButton {
         .tooltip_text("Sync Menu")
         .popover(&menu)
         .build();
-    sync_menu.connect_clicked(|_btn| {
+    sync_menu.connect_clicked(move |_btn| {
+        for child in bm_box.children().clone() {
+            bm_box.remove(&child);
+        }
+
         let cfg = Config::get_global();
         if cfg.stay_logged_in {
             // TODO: Try log in and show sign out button instead
             return;
         }
         
-        // TODO: Set up menu for login/register
+        let email_hbox = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true).margin_bottom(DEF_MARGIN)
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+            .build();
+        let email_label = Label::builder()
+            .label("Email:         ")
+            .margin_end(DEF_MARGIN).halign(Align::Start)
+            .build();
+        let email = Entry::builder().hexpand(true).build();
+        email_hbox.pack_start(&email_label, false, false, 0);
+        email_hbox.pack_start(&email, true, true, 0);
+        bm_box.pack_start(&email_hbox, false, false, 0);
+
+        let pword_hbox = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true).margin_bottom(DEF_MARGIN)
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+            .build();
+        let pword_label = Label::builder()
+            .label("Password:").margin_end(DEF_MARGIN).halign(Align::Start)
+            .build();
+        let pword = Entry::builder().hexpand(true).visibility(false).build();
+        pword_hbox.pack_start(&pword_label, false, false, 0);
+        pword_hbox.pack_start(&pword, true, true, 0);
+        bm_box.pack_start(&pword_hbox, false, false, 0);
+
+        let remember = CheckButton::builder()
+            .label("Stay logged in:").margin_bottom(DEF_MARGIN)
+            .hexpand(true).halign(Align::Center)
+            .build();
+        bm_box.pack_start(&remember, false, false, 0);
+
+        let btn_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true).margin_bottom(DEF_MARGIN)
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+            .build();
+        let reg_btn = Button::builder()
+            .label("Register").margin_end(DEF_MARGIN)
+            .build();
+        let login_btn = Button::builder().label("Login   ").build();
+        btn_box.pack_start(&reg_btn, true, true, 0);
+        btn_box.pack_start(&login_btn, true, true, 0);
+        bm_box.pack_start(&btn_box, false, false, 0);
+
+        reg_btn.connect_clicked(move |_btn| {
+            // TODO: Attempt to register
+        });
+        login_btn.connect_clicked(move |_btn| {
+            // TODO: Attempt to login
+        });
+
+        bm_box.show_all();
     });
 
     sync_menu
