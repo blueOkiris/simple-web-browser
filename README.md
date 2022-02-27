@@ -19,6 +19,7 @@ Goals:
 Install Dependencies:
 - cargo
 - [adblock-rust-server](https://github.com/dudik/blockit)
+  + Note #1: Recommended to add "https://easylist-downloads.adblockplus.org/easylist_min_content_blocker.json" to ~/.config/ars/urls
   + Note #2: the directory to place it in is: `adblock/`, so do the `sudo ln -s` to that location
 - libgtk3
 - Linux
