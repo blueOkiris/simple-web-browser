@@ -30,11 +30,11 @@ To simply try it out, from the repo folder, run `cargo run`
 
 If you want to install it somewhere:
 - Build with `cargo build --release`
-- Add ~/.cargo/bin/ to your PATH (or run with `PATH=$PATH:/home/$USER/.cargo/bin swb` once installed)
 - Copy the binary "swb" from target to the install location, /opt/swb/
 - Create a plugins/ folder in the install location and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
 - Copy your adblock/ folder containing the blockit.so file into that folder as well
-- Create whatever soft link you want to the binary and any .desktop file you want
+- `sudo ln -s /opt/swb/swb /usr/bin/swb`
+- Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
 
 Again, once the package is made, it will do all that jazz for you
 

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Simple Web Browser
+Icon=swb-icon
+Path=/opt/swb
+Exec=sh -c "PATH=$PATH:$HOME/.cargo/bin swb"
+Terminal=false
