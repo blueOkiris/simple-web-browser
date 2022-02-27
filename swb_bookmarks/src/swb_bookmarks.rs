@@ -59,7 +59,7 @@ fn create_sync_menu() -> MenuButton {
         .child(&menu_content)
         .build();
 
-    // TODO: Add control interface dependent on whether synced in or not
+    // Sync gets managed in on click later
     let bm_box = Box::builder()
         .hexpand(true).vexpand(true).orientation(Orientation::Vertical)
         .build();
@@ -81,6 +81,9 @@ fn create_sync_menu() -> MenuButton {
         .hexpand(false).direction(ArrowType::Down)
         .popover(&menu)
         .build();
+    sync_menu.connect_clicked(|_btn| {
+        // TODO: Add control interface for login/logout to bm_box
+    });
 
     sync_menu
 }
@@ -98,7 +101,7 @@ fn create_bm_menu() -> MenuButton {
         .child(&menu_content)
         .build();
 
-    // TODO: Load and add bookmarks data to bm menu
+    // Later these get bookmarks filled in
     let bm_box = Box::builder()
         .hexpand(true).vexpand(true).orientation(Orientation::Vertical)
         .build();
@@ -112,6 +115,7 @@ fn create_bm_menu() -> MenuButton {
         .build();
     menu_content.add(&bm_frame);
 
+    // Add control buttons
     let add_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
             .label("Add Bookmark")
@@ -162,6 +166,9 @@ fn create_bm_menu() -> MenuButton {
         .label("🕮").margin_start(DEF_MARGIN)
         .direction(ArrowType::Down).popover(&menu)
         .build();
+    bm_menu.connect_clicked(|_btn| {
+        // TODO: Load files from bookmark into bm_box
+    });
 
     bm_menu
 }
