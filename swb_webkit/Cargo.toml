@@ -1,0 +1,13 @@
+[package]
+name = "swb_webkit"
+version = "22.225.1"
+edition = "2021"
+
+[dependencies]
+webkit2gtk = { version = "0.17.1", features = [ "v2_16" ] }
+gtk = "0.15.4"
+
+[lib]
+name = "swb_webkit"
+crate-type = [ "cdylib" ]
+path = "src/swb_webkit.rs"
