@@ -12,7 +12,7 @@ use gtk::{
     Orientation, ArrowType, Align, InputPurpose,
     prelude::{
         ContainerExt, ButtonExt, WidgetExt, BoxExt,
-    }
+    }, traits::MenuButtonExt
 };
 use cascade::cascade;
 use crate::config::Config;
@@ -87,15 +87,32 @@ fn create_sync_menu() -> MenuButton {
         .tooltip_text("Sync Menu")
         .popover(&menu)
         .build();
-    sync_menu.connect_clicked(move |_btn| {
+    sync_menu.connect_clicked(move |menu_btn| {
+        // Reset the view
         for child in bm_box.children().clone() {
             bm_box.remove(&child);
         }
 
         let cfg = Config::get_global();
         if cfg.stay_logged_in {
-            // TODO: Try log in and show sign out button instead
-            return;
+            // TODO: Try log in first
+            // if login succeeded {
+                let log_out_btn = Button::builder()
+                    .label("Sign Out")
+                    .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
+                    .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+                    .hexpand(true).vexpand(true)
+                    .build();
+
+                let menu_btn_clone = menu_btn.clone();
+                log_out_btn.connect_clicked(move |_btn| {
+                    menu_btn_clone.popover().unwrap().hide();
+                });
+
+                bm_box.pack_start(&log_out_btn, true, true, 0);
+                bm_box.show_all();
+                return;
+            //}
         }
         
         let email_hbox = Box::builder()
