@@ -96,8 +96,10 @@ impl App {
     fn create_navbar(plugins: &Vec<Arc<Container<Plugin>>>) -> Box {
         let back_plugins = plugins.clone();
         let back_btn = cascade! {
-            Button::with_label("←");
-                ..set_margin_end(DEF_MARGIN); // margin to next btn
+            Button::builder()
+                .label("←").margin_end(DEF_MARGIN) // margin to next btn
+                .tooltip_text("Navigate Back")
+                .build();
                 ..connect_clicked(move |_btn| {
                     for plugin in &back_plugins {
                         plugin.on_back_btn_clicked();
@@ -107,8 +109,10 @@ impl App {
 
         let fwd_plugins = plugins.clone();
         let fwd_btn = cascade! {
-            Button::with_label("→");
-                ..set_margin_end(DEF_MARGIN); // margin to next btn
+            Button::builder()
+                .label("→").margin_end(DEF_MARGIN) // margin to next btn
+                .tooltip_text("Navigate Forward")
+                .build();
                 ..connect_clicked(move |_btn| {
                     for plugin in &fwd_plugins {
                         plugin.on_fwd_btn_clicked();
@@ -133,7 +137,10 @@ impl App {
 
         let refr_plugins = plugins.clone();
         let refr_btn = cascade! {
-            Button::with_label("↺");
+            Button::builder()
+                .label("↺").margin_end(DEF_MARGIN) // margin to next btn
+                .tooltip_text("Refresh Page")
+                .build();
                 ..connect_clicked(move |_btn| {
                     for plugin in &refr_plugins {
                         plugin.on_refr_btn_clicked();

@@ -94,6 +94,7 @@ pub fn on_navbar_load(navbar: &Box) {
 fn create_private_button() -> ToggleButton {
     let private_btn = ToggleButton::builder()
         .label("(¬■_■)").margin_start(DEF_MARGIN)
+        .tooltip_text("Toggle Private Browsing")
         .build();
     private_btn.connect_toggled(move |toggle| {
         // Reset with a new web view (REQUIRED by webkit2gtk)
@@ -139,6 +140,7 @@ fn create_settings_manager() -> Button {
 
     let adblock_starter = Button::builder()
         .label("⯃").margin_start(DEF_MARGIN)
+        .tooltip_text("AdBlock Settings Window")
         .build();
     adblock_starter.connect_clicked(move |_btn| {
         viewer.load_uri("blockit://settings");

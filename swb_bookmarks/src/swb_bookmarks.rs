@@ -79,6 +79,7 @@ fn create_sync_menu() -> MenuButton {
     let sync_menu = MenuButton::builder()
         .label("⇅").margin_start(DEF_MARGIN)
         .hexpand(false).direction(ArrowType::Down)
+        .tooltip_text("Sync Menu")
         .popover(&menu)
         .build();
     sync_menu.connect_clicked(|_btn| {
@@ -165,6 +166,7 @@ fn create_bm_menu() -> MenuButton {
     let bm_menu = MenuButton::builder()
         .label("🕮").margin_start(DEF_MARGIN)
         .direction(ArrowType::Down).popover(&menu)
+        .tooltip_text("Bookmarks Menu")
         .build();
     bm_menu.connect_clicked(|_btn| {
         // TODO: Load files from bookmark into bm_box
