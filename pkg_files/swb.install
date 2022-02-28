@@ -1,27 +1,3 @@
-post_install() {
-    cd /opt/swb/
-
-    echo "Downloading blockit."
-    git clone https://github.com/dudik/blockit
-
-    echo "Installing blockit."
-    cd blockit/
-    make install
-    mkdir ../adblock
-    ln -s /usr/local/lib/blockit.so /opt/swb/adblock/blockit.so
-
-    echo "Installing adblock-rust-server."
-    cargo install adblock-rust-server
-
-    cp ~/.cargo/bin/adblock-rust-server /opt/swb/adblock/
-
-    ln -s /opt/swb/swb /usr/bin/swb
-}
-
 post_remove() {
-    cd /opt/swb/blockit
-    make uninstall
-    cd /
-    rm -rf /usr/bin/swb
     rm -rf /opt/swb
 }
