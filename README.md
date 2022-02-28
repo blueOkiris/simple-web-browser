@@ -10,11 +10,11 @@ A Web Browser should be a Web Browser and nothing more, and it should integrate 
 
 Goals:
 1. Built with GTK/Qt to integrate with DEs
-2. Adblock and Password/Bookmark sync
+2. Adblock and Password/Bookmark sync and autofill, but nothing more
 3. Mobile client
 4. Decent performance (built on top 3 engines: Blink, Gecko, or Webkit)
 5. Private out of the box (no telemetry, ads, or data collection)
-6. Not built on Chromium
+6. Not built on Chromium (not hard )
 
 ## Build
 
@@ -25,7 +25,9 @@ First, install Dependencies:
 - [adblock-rust-server](https://github.com/dudik/blockit)
   + Note #1: Recommended to add "https://easylist-downloads.adblockplus.org/easylist_min_content_blocker.json" to ~/.config/ars/urls
   + Note #2: the directory to place it in is: `adblock/`, so do the `sudo ln -s` to that location
-- libgtk3
+- webkit2gtk libs
+- gtk3 libs
+- pkgconf
 - Linux
 
 To simply try it out, from the repo folder, run `cargo run`

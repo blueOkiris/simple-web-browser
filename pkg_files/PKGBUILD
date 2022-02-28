@@ -1,0 +1,35 @@
+# Maintainer: Dylan Turner dylantdmt@gmail.com
+pkgname=swb-git
+pkgver=21.227
+pkgrel=1
+epoch=
+pkgdesc="A simple Gtk web browser written in Rust supporting plugins to replace default WebKit, sync, or whatever you want"
+arch=('any')
+url="https://www.github.com/blueOkiris/simple-web-browser"
+license=('GPL3')
+makedepends=('git' 'rust' 'gtk3' 'pkgconf' 'webkit2gtk' 'make')
+source=('git://github.com/blueOkiris/simple-web-browser.git')
+md5sums=('SKIP')
+install='swb.install'
+
+package() {
+    echo "Installing adblock-rust-server."
+    cargo install adblock-rust-server
+
+    echo "Building project."
+    cd simple-web-browser; cargo build --release; cd ..
+
+    echo "Installing to $pkgdir/opt/swb."
+
+    mkdir -p "$pkgdir/opt/swb"
+    cp simple-web-browser/target/release/swb "$pkgdir/opt/swb"
+
+    mkdir -p "$pkgdir/opt/swb/plugins"
+    cp simple-web-browser/target/release/libswb_webkit.so "$pkgdir/opt/swb/plugins"
+    cp simple-web-browser/target/release/libswb_bookmarks.so "$pkgdir/opt/swb/plugins"
+
+    mkdir -p "$pkgdir/usr/share/pixmaps"
+    cp simple-web-browser/swb-icon.png "$pkgdir/usr/share/pixmaps"
+    mkdir -p "$pkgdir/usr/share/applications"
+    cp simple-web-browser/swb.desktop "$pkgdir/usr/share/applications"
+}
