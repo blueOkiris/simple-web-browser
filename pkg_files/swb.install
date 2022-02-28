@@ -10,6 +10,11 @@ post_install() {
     mkdir ../adblock
     ln -s /usr/local/lib/blockit.so /opt/swb/adblock/blockit.so
 
+    echo "Installing adblock-rust-server."
+    cargo install adblock-rust-server
+
+    cp ~/.cargo/bin/adblock-rust-server /opt/swb/adblock/
+
     ln -s /opt/swb/swb /usr/bin/swb
 }
 

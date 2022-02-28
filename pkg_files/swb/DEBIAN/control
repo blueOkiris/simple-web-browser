@@ -1,0 +1,10 @@
+Package: swb
+Version: 22.227
+Section: internet
+Priority: optional
+Architecture: all
+Essential: no
+Installed-size: 40
+Maintainer: dylantdmt@gmail.com
+Description: A simple Gtk web browser written in Rust supporting plugins to replace default WebKit, sync, or whatever you want
+Depends: git, build-essential, cargo, libgtk-3-dev, libwebkit2gtk-4.0-dev, pkgconf, libssl-dev, ttf-unifont

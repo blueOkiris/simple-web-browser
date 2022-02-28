@@ -1,7 +1,6 @@
 *.lock
 target/
 *.log
-swb
 
 adblock/
 blockit/

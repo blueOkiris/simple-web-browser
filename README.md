@@ -14,7 +14,9 @@ Goals:
 3. Mobile client
 4. Decent performance (built on top 3 engines: Blink, Gecko, or Webkit)
 5. Private out of the box (no telemetry, ads, or data collection)
-6. Not built on Chromium (not hard )
+6. Not built on Chromium (not hard)
+
+Supported platforms: Arch, Ubuntu 21.10
 
 ## Build
 
@@ -37,6 +39,7 @@ If you want to install it somewhere:
 - Copy the binary "swb" from target to the install location, /opt/swb/
 - Create a plugins/ folder in the install location and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
 - Copy your adblock/ folder containing the blockit.so file into that folder as well
+- Copy ~/.cargo/bin/adblock-rust-server to /opt/swb/adblock
 - `sudo ln -s /opt/swb/swb /usr/bin/swb`
 - Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
 

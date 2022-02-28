@@ -13,9 +13,6 @@ md5sums=('SKIP')
 install='swb.install'
 
 package() {
-    echo "Installing adblock-rust-server."
-    cargo install adblock-rust-server
-
     echo "Building project."
     cd simple-web-browser; cargo build --release; cd ..
 
