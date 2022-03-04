@@ -26,11 +26,30 @@ const START_PAGE: &'static str = "https://duckduckgo.com/";
 const DEF_MARGIN: i32 = 5;
 const ADBLOCK_EXTENSION_DIR: &'static str = "adblock";
 
+/* Unused plugin functions */
+
+#[no_mangle]
+pub fn queue_send_msg() -> Option<(String, String)> {
+    None
+}
+
 /* Used plugin functions */
 
 #[no_mangle]
 pub fn name() -> String {
     String::from(NAME)
+}
+
+// Check for other plugins redirecting us
+#[no_mangle]
+pub fn recv_msgs(msgs: &Vec<(String, String)>) {
+    for (sndr, msg) in msgs {
+        if sndr == &String::from("WEBKIT_REDIRECT") {
+            unsafe {
+                WEB_VIEW_MANAGER.navigate(msg);
+            }
+        }
+    }
 }
 
 // Create the web view in the manager

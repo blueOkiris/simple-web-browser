@@ -34,14 +34,14 @@ struct User {
     pword_hash: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Bookmark {
     pub name: String,
     pub url: String,
     pub folder: Option<String>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BookmarkCollection {
     pub user_email: String,
     pub bookmarks: Vec<Bookmark>

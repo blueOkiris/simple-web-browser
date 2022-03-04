@@ -9,6 +9,7 @@ use serde::{
 use confy::{
     load, store
 };
+use crate::sync::BookmarkCollection;
 
 static mut CONFIG: Option<Config> = None;
 
@@ -17,7 +18,8 @@ pub struct Config {
     pub stay_logged_in: bool,
     pub email: String,
     pub pword: String,
-    pub logged_in: bool
+    pub logged_in: bool,
+    pub bm_collection: BookmarkCollection
 }
 
 impl Default for Config {
@@ -26,7 +28,11 @@ impl Default for Config {
             stay_logged_in: false,
             email: String::new(),
             pword: String::new(),
-            logged_in: false
+            logged_in: false,
+            bm_collection: BookmarkCollection {
+                user_email: String::new(),
+                bookmarks: Vec::new()
+            }
         }
     }
 }

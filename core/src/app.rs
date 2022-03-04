@@ -5,7 +5,10 @@
 
 use std::{
     env::set_var,
-    sync::Arc
+    sync::{
+        Arc,
+        mpsc::channel
+    }
 };
 use gtk::{
     Application, ApplicationWindow,
@@ -13,8 +16,8 @@ use gtk::{
     Orientation, Align,
     prelude::{
         ApplicationExt, ApplicationExtManual, WidgetExt,
-        ButtonExt, EntryExt, ContainerExt
-    }
+        ButtonExt, EntryExt, ContainerExt, Continue
+    }, glib::idle_add
 };
 use cascade::cascade;
 use dlopen::wrapper::Container;
@@ -50,6 +53,7 @@ impl App {
     pub fn run(self) {
         let gtk_app = Application::builder().application_id(APP_ID).build();
         let plugins = self.plugins.clone();
+        let (quit_tx, quit_rx) = channel();
         gtk_app.connect_activate(move |app| {
             let win = ApplicationWindow::builder()
                 .application(app)
@@ -63,9 +67,35 @@ impl App {
 
             win.show_all();
         });
+        gtk_app.connect_shutdown(move |_app| {
+            quit_tx.send(true).expect("Error sending quit signal");
+        });
+
+        idle_add(move || {
+            // Quit when window closes
+            match quit_rx.try_recv() {
+                Err(_err) => { },
+                Ok(_should_quit) => {
+                    return Continue(false);
+                }
+            }
+
+            // No message sent, so keep processing
+            let mut msgs = Vec::new();
+            for plugin in &self.plugins {
+                let msg = plugin.queue_send_msg();
+                if !msg.is_none() {
+                    msgs.push(msg.unwrap());
+                }
+            }
+            for plugin in &self.plugins {
+                plugin.recv_msgs(&msgs.clone());
+            }
+
+            Continue(true)
+        });
 
         gtk_app.run();
-        gtk_app.quit();
     }
 
     // Set up all the content that goes into the GUI window and its events
@@ -93,7 +123,8 @@ impl App {
     }
 
     // Create the top button bar
-    fn create_navbar(plugins: &Vec<Arc<Container<Plugin>>>) -> Box {
+    fn create_navbar(
+            plugins: &Vec<Arc<Container<Plugin>>>) -> Box {
         let back_plugins = plugins.clone();
         let back_btn = cascade! {
             Button::builder()

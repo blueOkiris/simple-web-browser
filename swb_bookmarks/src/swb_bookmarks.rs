@@ -6,30 +6,34 @@
 mod sync;
 mod config;
 
+use std::collections::HashMap;
 use gtk::{
-    MenuButton, Box, Popover, ScrolledWindow, Frame,
+    MenuButton, Box, Popover, ScrolledWindow, Frame, MenuItem, Menu, MenuBar,
     Entry, Label, CheckButton, Button, Dialog, TextView, TextBuffer,
-    Orientation, ArrowType, Align, ResponseType,
+    Orientation, ArrowType, Align, ResponseType, PackDirection,
     prelude::{
         ContainerExt, ButtonExt, WidgetExt, BoxExt, EntryExt, DialogExt,
-        GtkWindowExt, MenuButtonExt
-    }, traits::ToggleButtonExt 
+        GtkWindowExt, MenuButtonExt, ToggleButtonExt, MenuShellExt,
+        GtkMenuItemExt
+    }
 };
 use cascade::cascade;
-use sync::get_bookmarks;
 use crate::{
     config::Config,
     sync::{
-        login, register
+        login, register, get_bookmarks, Bookmark
     }
 };
 
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const POPOVER_HEIGHT: i32 = 200;
+const SYNC_POPOVER_HEIGHT: i32 = 200;
+const BM_POPOVER_HEIGHT: i32 = 400;
 const POPUP_WIDTH: i32 = 250;
 const POPUP_HEIGHT: i32 = 100;
+
+static mut MSG_QUEUE: Option<Vec<(String, String)>> = None;
 
 /* Unused plugin functions */
 
@@ -43,6 +47,8 @@ pub fn on_change_page(_url: &String) { }
 pub fn on_refr_btn_clicked() { }
 #[no_mangle]
 pub fn on_window_content_load(_content: &Box) { }
+#[no_mangle]
+pub fn recv_msgs(_msgs: &Vec<(String, String)>) { }
 
 /* Used plugin functions */
 
@@ -60,46 +66,60 @@ pub fn on_navbar_load(navbar: &Box) {
     navbar.add(&sync_btn);
 }
 
+#[no_mangle]
+pub fn queue_send_msg() -> Option<(String, String)> {
+    unsafe {
+        if MSG_QUEUE.clone().is_none() || MSG_QUEUE.clone().unwrap().len() < 1 {
+            None
+        } else {
+            let mut msg_queue = MSG_QUEUE.clone().unwrap();
+            let msg = msg_queue.pop();
+            MSG_QUEUE = Some(msg_queue);
+            msg
+        }
+    }
+}
+
 // Create menu for logging and syncing passwords and bookmarks
 fn create_sync_menu() -> MenuButton {
     // Container for data
-    let menu_content = Box::builder()
+    let popover_content = Box::builder()
         .orientation(Orientation::Vertical)
         .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
         .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
         .build();
-    let menu = Popover::builder()
-        .width_request(POPOVER_WIDTH).height_request(POPOVER_HEIGHT)
-        .child(&menu_content)
+    let popover = Popover::builder()
+        .width_request(POPOVER_WIDTH).height_request(SYNC_POPOVER_HEIGHT)
+        .child(&popover_content)
         .build();
 
     // Sync gets managed in on click later
-    let bm_box = Box::builder()
+    let sync_box = Box::builder()
         .hexpand(true).vexpand(true).orientation(Orientation::Vertical)
         .build();
-    let bm_scroller = ScrolledWindow::builder()
+    let sync_scroller = ScrolledWindow::builder()
         .hexpand(true).vexpand(true)
-        .child(&bm_box)
+        .child(&sync_box)
         .build();
-    let bm_frame = Frame::builder()
+    let sync_frame = Frame::builder()
         .label("Sync:").hexpand(true).vexpand(true)
-        .child(&bm_scroller)
+        .child(&sync_scroller)
         .build();
-    menu_content.add(&bm_frame);
+        popover_content.add(&sync_frame);
 
-    menu.show_all();
-    menu.hide();
+    popover.show_all();
+    popover.hide();
 
     let sync_menu = MenuButton::builder()
         .label("⇅").margin_start(DEF_MARGIN)
         .hexpand(false).direction(ArrowType::Down)
         .tooltip_text("Sync Menu")
-        .popover(&menu)
+        .popover(&popover)
         .build();
     let sync_events = move |menu_btn: &MenuButton| {
         // Reset the view
-        for child in bm_box.children().clone() {
-            bm_box.remove(&child);
+        for child in sync_box.children().clone() {
+            sync_box.remove(&child);
         }
 
         // Could clean up to reuse code, but it's not too bad rn
@@ -132,8 +152,8 @@ fn create_sync_menu() -> MenuButton {
                     menu_btn_clone.popover().unwrap().hide();
                 });
 
-                bm_box.pack_start(&log_out_btn, true, true, 0);
-                bm_box.show_all();
+                sync_box.pack_start(&log_out_btn, true, true, 0);
+                sync_box.show_all();
 
                 return;
             }
@@ -151,7 +171,7 @@ fn create_sync_menu() -> MenuButton {
         let email = Entry::builder().hexpand(true).build();
         email_hbox.pack_start(&email_label, false, false, 0);
         email_hbox.pack_start(&email, true, true, 0);
-        bm_box.pack_start(&email_hbox, false, false, 0);
+        sync_box.pack_start(&email_hbox, false, false, 0);
 
         let pword_hbox = Box::builder()
             .orientation(Orientation::Horizontal)
@@ -164,13 +184,13 @@ fn create_sync_menu() -> MenuButton {
         let pword = Entry::builder().hexpand(true).visibility(false).build();
         pword_hbox.pack_start(&pword_label, false, false, 0);
         pword_hbox.pack_start(&pword, true, true, 0);
-        bm_box.pack_start(&pword_hbox, false, false, 0);
+        sync_box.pack_start(&pword_hbox, false, false, 0);
 
         let remember = CheckButton::builder()
             .label("Stay logged in").margin_bottom(DEF_MARGIN)
             .hexpand(true).halign(Align::Center)
             .build();
-        bm_box.pack_start(&remember, false, false, 0);
+        sync_box.pack_start(&remember, false, false, 0);
 
         let btn_box = Box::builder()
             .orientation(Orientation::Horizontal)
@@ -183,7 +203,7 @@ fn create_sync_menu() -> MenuButton {
         let login_btn = Button::builder().label("Login   ").build();
         btn_box.pack_start(&reg_btn, true, true, 0);
         btn_box.pack_start(&login_btn, true, true, 0);
-        bm_box.pack_start(&btn_box, false, false, 0);
+        sync_box.pack_start(&btn_box, false, false, 0);
 
         // Handle login/registration
         let reg_email = email.clone();
@@ -267,7 +287,7 @@ fn create_sync_menu() -> MenuButton {
         let log_email = email.clone();
         let log_pword = pword.clone();
         let log_remem = remember.clone();
-        let log_menu_clone = menu.clone();
+        let log_popover_clone = popover.clone();
         login_btn.connect_clicked(move |_btn| {
             let email_txt = log_email.text().to_ascii_lowercase();
             let pword_txt = log_pword.text().to_string();
@@ -344,12 +364,12 @@ fn create_sync_menu() -> MenuButton {
                     Config::set_global(cfg);
                     Config::store_global();
 
-                    log_menu_clone.hide();
+                    log_popover_clone.hide();
                 }
             }
         });
 
-        bm_box.show_all();
+        sync_box.show_all();
     };
     sync_menu.connect_clicked(sync_events.clone()); // Login also when clicked
     sync_events(&sync_menu.clone());
@@ -360,29 +380,30 @@ fn create_sync_menu() -> MenuButton {
 // Create menu for managing bookmarks
 fn create_bm_menu() -> MenuButton {
     // Container for data
-    let menu_content = Box::builder()
+    let popover_content = Box::builder()
         .orientation(Orientation::Vertical)
         .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
         .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
         .build();
-    let menu = Popover::builder()
-        .width_request(POPOVER_WIDTH).height_request(POPOVER_HEIGHT)
-        .child(&menu_content)
+    let popover = Popover::builder()
+        .width_request(POPOVER_WIDTH).height_request(BM_POPOVER_HEIGHT)
+        .child(&popover_content)
         .build();
 
     // Later these get bookmarks filled in
-    let bm_box = Box::builder()
-        .hexpand(true).vexpand(true).orientation(Orientation::Vertical)
+    let bm_menu = MenuBar::builder()
+        .hexpand(true).vexpand(true)
+        .pack_direction(PackDirection::Ttb)
         .build();
     let bm_scroller = ScrolledWindow::builder()
         .hexpand(true).vexpand(true)
-        .child(&bm_box)
+        .child(&bm_menu)
         .build();
     let bm_frame = Frame::builder()
         .label("Bookmarks:").hexpand(true).vexpand(true)
         .child(&bm_scroller)
         .build();
-    menu_content.add(&bm_frame);
+    popover_content.add(&bm_frame);
 
     // Add control buttons
     let add_btn = cascade! {
@@ -394,7 +415,7 @@ fn create_bm_menu() -> MenuButton {
                 // TODO: Add bookmarks
             });
     };
-    menu_content.add(&add_btn);
+    popover_content.add(&add_btn);
 
     let edit_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
@@ -405,7 +426,7 @@ fn create_bm_menu() -> MenuButton {
                 // TODO: Edit bookmarks
             });
     };
-    menu_content.add(&edit_btn);
+    popover_content.add(&edit_btn);
 
     let add_fldr_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
@@ -416,7 +437,7 @@ fn create_bm_menu() -> MenuButton {
                 // TODO: Add folder
             });
     };
-    menu_content.add(&add_fldr_btn);
+    popover_content.add(&add_fldr_btn);
 
     let rm_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
@@ -426,45 +447,119 @@ fn create_bm_menu() -> MenuButton {
                 // TODO: Remove bookmark or folder
             });
     };
-    menu_content.add(&rm_btn);
+    popover_content.add(&rm_btn);
 
-    menu.show_all();
-    menu.hide();
+    popover.show_all();
+    popover.hide();
 
-    let bm_menu = MenuButton::builder()
+    let bm_btn = MenuButton::builder()
         .label("🕮").margin_start(DEF_MARGIN)
-        .direction(ArrowType::Down).popover(&menu)
+        .direction(ArrowType::Down).popover(&popover)
         .tooltip_text("Bookmarks Menu")
         .build();
     let load_bms = move |_menu_btn: &MenuButton| {
+        // Reset the view
+        for child in bm_menu.children().clone() {
+            bm_menu.remove(&child);
+        }
+
         // Try to sync
         let bookmarks = match get_bookmarks() {
             Err(err) => {
                 println!("Failed to sync bookmarks: {} Contiuing local", err);
-                // TODO: Load bookmarks from file
-                Vec::new()
+                let cfg = Config::get_global();
+                cfg.bm_collection.bookmarks
             }, Ok(bm_collection) => {
-                // TODO: Replace local bookmarks with synced ones
+                let mut cfg = Config::get_global();
+                cfg.bm_collection = bm_collection.clone();
+                Config::set_global(cfg);
+                Config::store_global();
+
                 bm_collection.bookmarks
             }
         };
 
-        // Get folder names first
-        let mut folders = Vec::new();
-        for bookmark in bookmarks {
-            println!("Bookmark: {:?}", bookmark);
+        // Build menu
+        let mut folders: HashMap<String, Vec<Bookmark>> = HashMap::new();
 
+        // Sort bookmarks into folders
+        for bookmark in bookmarks.clone() {
             if !bookmark.folder.is_none() {
-                folders.push(bookmark.folder.unwrap().clone());
+                let folder_name = bookmark.folder.clone().unwrap();
+                if !folders.contains_key(&folder_name.clone()) {
+                    folders.insert(folder_name.clone(), Vec::new());
+                }
+                let mut bms = folders[&folder_name.clone()].clone();
+                bms.push(bookmark.clone());
+                folders.insert(folder_name.clone(), bms.clone());
             }
         }
 
-        // TODO: Create bm menu in bm_box
+        // Add folders first
+        for (name, bms) in folders {
+            let fldr = MenuItem::builder()
+                .label(&name.clone())
+                .hexpand(true).vexpand(false)
+                .build();
+            let fldr_menu = Menu::builder().build();
+            for bm in bms {
+                let bm_item = MenuItem::builder()
+                    .label(&bm.name.clone())
+                    .hexpand(true).vexpand(false)
+                    .build();
+                let name_clone = bm.name.clone();
+                bm_item.connect_activate(move |_menu_item| {
+                    unsafe {
+                        if MSG_QUEUE.clone().is_none() {
+                            MSG_QUEUE = Some(Vec::new())
+                        }
+                        let mut queue = MSG_QUEUE.clone().unwrap();
+                        queue.push((
+                            String::from("WEBKIT_REDIRECT"),
+                            name_clone.clone()
+                        ));
+                        MSG_QUEUE = Some(queue);
+                    }
+                });
+                fldr_menu.append(&bm_item);
+            }
+            fldr.set_submenu(Some(&fldr_menu));
+            bm_menu.add(&fldr);
+        }
 
+        // Now add the regular bookmarks
+        for bookmark in bookmarks {
+            if !bookmark.folder.is_none() {
+                continue;
+            }
+
+            let bm = MenuItem::builder()
+                .label(&bookmark.name)
+                .hexpand(true).vexpand(false)
+                .build();
+            let name_clone = bookmark.name.clone();
+            bm.connect_activate(move |_menu_item| {
+                unsafe {
+                    if MSG_QUEUE.clone().is_none() {
+                        MSG_QUEUE = Some(Vec::new())
+                    }
+                    let mut queue = MSG_QUEUE.clone().unwrap();
+                    queue.push((
+                        String::from("WEBKIT_REDIRECT"),
+                        name_clone.clone()
+                    ));
+                    MSG_QUEUE = Some(queue);
+                }
+            });
+
+            bm_menu.add(&bm);
+        }
+
+        bm_menu.show_all();
     };
 
     // Idk why I couldn't load it as a param like w/ sync button, but oh well
-    bm_menu.connect_clicked(load_bms.clone());
+    bm_btn.connect_clicked(load_bms.clone());
 
-    bm_menu
+    bm_btn
 }
