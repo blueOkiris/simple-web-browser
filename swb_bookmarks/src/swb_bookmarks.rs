@@ -16,6 +16,7 @@ use gtk::{
     }, traits::ToggleButtonExt 
 };
 use cascade::cascade;
+use sync::get_bookmarks;
 use crate::{
     config::Config,
     sync::{
@@ -95,25 +96,25 @@ fn create_sync_menu() -> MenuButton {
         .tooltip_text("Sync Menu")
         .popover(&menu)
         .build();
-    sync_menu.connect_clicked(move |menu_btn| {
+    let sync_events = move |menu_btn: &MenuButton| {
         // Reset the view
         for child in bm_box.children().clone() {
             bm_box.remove(&child);
         }
 
         // Could clean up to reuse code, but it's not too bad rn
-        let cfg = Config::get_global();
+        let mut cfg = Config::get_global();
         if cfg.logged_in || cfg.stay_logged_in {
-            let mut logged_in = cfg.logged_in;
-            if !logged_in {
+            if !cfg.logged_in {
                 // Try to log in
-                let email = cfg.email;
-                let pword = cfg.pword;
+                let email = cfg.clone().email;
+                let pword = cfg.clone().pword;
                 let log_res = login(&email, &pword);
-                logged_in = log_res.is_ok()
+                cfg.logged_in = log_res.is_ok();
+                Config::set_global(cfg.clone());
             }
 
-            if logged_in {
+            if cfg.logged_in {
                 let log_out_btn = Button::builder()
                     .label("Sign Out")
                     .margin_bottom(DEF_MARGIN).margin_top(DEF_MARGIN)
@@ -349,7 +350,9 @@ fn create_sync_menu() -> MenuButton {
         });
 
         bm_box.show_all();
-    });
+    };
+    sync_menu.connect_clicked(sync_events.clone()); // Login also when clicked
+    sync_events(&sync_menu.clone());
 
     sync_menu
 }
@@ -433,9 +436,35 @@ fn create_bm_menu() -> MenuButton {
         .direction(ArrowType::Down).popover(&menu)
         .tooltip_text("Bookmarks Menu")
         .build();
-    bm_menu.connect_clicked(|_btn| {
-        // TODO: Load files from bookmark into bm_box
-    });
+    let load_bms = move |_menu_btn: &MenuButton| {
+        // Try to sync
+        let bookmarks = match get_bookmarks() {
+            Err(err) => {
+                println!("Failed to sync bookmarks: {} Contiuing local", err);
+                // TODO: Load bookmarks from file
+                Vec::new()
+            }, Ok(bm_collection) => {
+                // TODO: Replace local bookmarks with synced ones
+                bm_collection.bookmarks
+            }
+        };
+
+        // Get folder names first
+        let mut folders = Vec::new();
+        for bookmark in bookmarks {
+            println!("Bookmark: {:?}", bookmark);
+
+            if !bookmark.folder.is_none() {
+                folders.push(bookmark.folder.unwrap().clone());
+            }
+        }
+
+        // TODO: Create bm menu in bm_box
+
+    };
+
+    // Idk why I couldn't load it as a param like w/ sync button, but oh well
+    bm_menu.connect_clicked(load_bms.clone());
 
     bm_menu
 }

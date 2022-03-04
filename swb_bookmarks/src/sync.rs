@@ -21,6 +21,7 @@ use rand::{
 };
 use tokio::runtime::Runtime;
 use reqwest::get;
+use crate::config::Config;
 
 const DB_LOGIN: &'static str =
     "mongodb://simple_web_browser:password@blueokiris.com:27017";
@@ -33,8 +34,53 @@ struct User {
     pword_hash: String
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Bookmark {
+    pub name: String,
+    pub url: String,
+    pub folder: Option<String>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BookmarkCollection {
+    pub user_email: String,
+    pub bookmarks: Vec<Bookmark>
+}
+
+// Requires sync! Do check beforehand
+pub fn get_bookmarks() -> Result<BookmarkCollection, Box<dyn Error>> {
+    let cfg = Config::get_global();
+    if !cfg.logged_in {
+        Err("Can't sync bookmarks! Not logged in.")?
+    }
+
+    let runtime = Runtime::new().unwrap();
+    let fut = get_bookmarks_async(&cfg.email);
+    runtime.block_on(fut)
+}
+
+async fn get_bookmarks_async(
+        email: &String) -> Result<BookmarkCollection, Box<dyn Error>> {
+    let client = Client::with_uri_str(DB_LOGIN).await?;
+    let bm_db = client.database("bookmarks");
+    let all_bms: Collection<BookmarkCollection> = bm_db.collection("bookmarks");
+
+    let filter = doc! {
+        "user_email": email
+    };
+    let result = all_bms.find_one(filter, None).await?;
+    
+    let user_bms = match result {
+        Some(ub) => ub,
+        None => Err("Failed to get bookmarks.")?
+    };
+
+    Ok(user_bms)
+}
+
 pub fn register(
-        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+        email_txt: &String,
+        pword_txt: &String) -> Result<(), Box<dyn Error>> {
     // Mongo is async, but we don't want that, so we wait for it to finish
     let runtime = Runtime::new().unwrap();
     let fut = register_async(email_txt, pword_txt);
@@ -42,14 +88,16 @@ pub fn register(
 }
 
 pub fn login(
-        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+        email_txt: &String,
+        pword_txt: &String) -> Result<(), Box<dyn Error>> {
     let runtime = Runtime::new().unwrap();
     let fut = login_async(email_txt, pword_txt);
     runtime.block_on(fut)
 }
 
 async fn login_async(
-        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+        email_txt: &String,
+        pword_txt: &String) -> Result<(), Box<dyn Error>> {
     let client = Client::with_uri_str(DB_LOGIN).await?;
     let bm_db = client.database("bookmarks");
     let users: Collection<User> = bm_db.collection("users");
@@ -77,7 +125,8 @@ async fn login_async(
 }
 
 async fn register_async(
-        email_txt: &String, pword_txt: &String) -> Result<(), Box<dyn Error>> {
+        email_txt: &String,
+        pword_txt: &String) -> Result<(), Box<dyn Error>> {
     assert_valid_email(email_txt).await?;
 
     let client = Client::with_uri_str(DB_LOGIN).await?;
@@ -101,7 +150,8 @@ async fn register_async(
 }
 
 // Check that email is real
-async fn assert_valid_email(email_txt: &String) -> Result<(), Box<dyn Error>> {
+async fn assert_valid_email(
+        email_txt: &String) -> Result<(), Box<dyn Error>> {
     let request_url = format!(
         "https://isitarealemail.com/api/email/validate?email={}",
         email_txt
@@ -111,7 +161,7 @@ async fn assert_valid_email(email_txt: &String) -> Result<(), Box<dyn Error>> {
     if result == String::from("{\"status\":\"valid\"}") {
         Ok(())
     } else {
-        Err(format!("Email '{}' is invalid.", email_txt).to_owned())?
+        Err(format!("Email '{}' is invalid.", email_txt))?
     }
 }
 
