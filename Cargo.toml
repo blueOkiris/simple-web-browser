@@ -1,2 +1,2 @@
 [workspace]
-members = [ "core", "swb_webkit", "swb_bookmarks" ]
+members = [ "core", "swb_webkit", "swb_bookmarks", "db" ]
