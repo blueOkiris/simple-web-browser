@@ -13,13 +13,6 @@ use dlopen::wrapper::{
 };
 use gtk::Box;
 
-#[cfg(debug_assertions)]
-const PLUGIN_DIR: &'static str = "target/debug";
-
-// When building the final app, we'll create a "plugins" folder in install dir
-#[cfg(not(debug_assertions))]
-const PLUGIN_DIR: &'static str = "/opt/swb/plugins";
-
 #[derive(WrapperApi)]
 pub struct Plugin {
     name: extern fn() -> String,
@@ -36,7 +29,18 @@ pub struct Plugin {
 pub fn load_plugins() -> Vec<Arc<Container<Plugin>>> {
     let mut plugins = Vec::new();
 
-    let paths = read_dir(PLUGIN_DIR).unwrap();
+    let paths;
+    #[cfg(debug_assertions)]
+    {
+        paths = read_dir("target/debug").unwrap();
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let mut conf = config_dir().unwrap();
+        conf.push("swb");
+        conf.push("plugins");
+        paths = read_dir(conf.as_os_str().to_str().unwrap());
+    }
     for path in paths {
         let fname = path.unwrap().path().display().to_string();
         if fname.ends_with(".so") {

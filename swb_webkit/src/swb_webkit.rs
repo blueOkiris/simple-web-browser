@@ -24,7 +24,6 @@ use crate::manager::{
 const NAME: &'static str = "Swb Webkit";
 const START_PAGE: &'static str = "https://duckduckgo.com/";
 const DEF_MARGIN: i32 = 5;
-const ADBLOCK_EXTENSION_DIR: &'static str = "adblock";
 
 /* Unused plugin functions */
 
@@ -57,8 +56,16 @@ pub fn recv_msgs(msgs: &Vec<(String, String)>) {
 pub fn on_window_content_load(content: &Box) {
     // Enable adblock
     let web_ctx = WebContext::builder().build();
-    web_ctx.set_web_extensions_directory(ADBLOCK_EXTENSION_DIR);
-
+    #[cfg(debug_assertions)]
+    web_ctx.set_web_extensions_directory("adblock");
+    #[cfg(not(debug_assertions))]
+    {
+        let mut conf = config_dir().unwrap();
+        conf.push("swb");
+        conf.push("adblock");
+        web_ctx.set_web_extensions_directory(conf.as_os_str().to_str().unwrap());    
+    }
+    
     // Create the view
     let web_view = WebView::builder().web_context(&web_ctx).build();
     web_view.load_uri(START_PAGE);
@@ -120,7 +127,16 @@ fn create_private_button() -> ToggleButton {
 
         // Enable adblock
         let web_ctx = WebContext::builder().build();
-        web_ctx.set_web_extensions_directory(ADBLOCK_EXTENSION_DIR);
+        #[cfg(debug_assertions)]
+        web_ctx.set_web_extensions_directory("adblock");
+        #[cfg(not(debug_assertions))]
+        {
+            let mut conf = config_dir().unwrap();
+            conf.push("swb");
+            conf.push("adblock");
+            web_ctx.set_web_extensions_directory(conf.as_os_str().to_str().unwrap());
+            
+        }
 
         // Create the view
         let web_view = WebView::builder()
@@ -152,7 +168,15 @@ fn create_private_button() -> ToggleButton {
 fn create_settings_manager() -> Button {
     // Create a mini web view in our menu to manage blockit
     let web_ctx = WebContext::builder().build(); // Add adblock here as well
-    web_ctx.set_web_extensions_directory(ADBLOCK_EXTENSION_DIR);
+    #[cfg(debug_assertions)]
+    web_ctx.set_web_extensions_directory("adblock");
+    #[cfg(not(debug_assertions))]
+    {
+        let mut conf = config_dir().unwrap();
+        conf.push("swb");
+        conf.push("adblock");
+        web_ctx.set_web_extensions_directory(conf.as_os_str().to_str().unwrap());
+    }
     let viewer = WebView::builder().web_context(&web_ctx).build();
 
     // Don't draw or anything as it starts up in a separate window

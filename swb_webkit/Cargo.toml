@@ -11,3 +11,4 @@ gtk = "0.15.4"
 name = "swb_webkit"
 crate-type = [ "cdylib" ]
 path = "src/swb_webkit.rs"
+

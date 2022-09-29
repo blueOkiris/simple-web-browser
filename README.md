@@ -33,9 +33,10 @@ To simply try it out, from the repo folder, run `cargo run`
 
 If you want to install it somewhere:
 - Build with `cargo build --release`
+- Install adblock-rust-server via `cargo install adblock-rust-server`. Make sure `~/.cargo/bin/` is in your PATH
 - Copy the binary "swb" from target/release to /usr/bin/
 - Create a plugins/ folder in the install location, /opt/swb/, and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
-- Copy your adblock/ folder containing the blockit.so file and adblock-rust-server into /opt/swb/ as well
+- Copy your adblock/ folder containing the blockit.so file into /opt/swb/ as well
 - Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
 
 Again, once the package is made, it will do all that jazz for you
