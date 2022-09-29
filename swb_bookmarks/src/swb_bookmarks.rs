@@ -6,34 +6,32 @@
 mod sync;
 mod config;
 
-use std::collections::HashMap;
 use gtk::{
-    MenuButton, Box, Popover, ScrolledWindow, Frame, MenuItem, Menu, MenuBar,
+    MenuButton, Box, Popover, ScrolledWindow, Frame, MenuItem, MenuBar,
     Entry, Label, CheckButton, Button, Dialog, TextView, TextBuffer,
     Orientation, ArrowType, Align, ResponseType, PackDirection,
     prelude::{
         ContainerExt, ButtonExt, WidgetExt, BoxExt, EntryExt, DialogExt,
-        GtkWindowExt, MenuButtonExt, ToggleButtonExt, MenuShellExt,
-        GtkMenuItemExt
+        GtkWindowExt, MenuButtonExt, ToggleButtonExt, GtkMenuItemExt
     }
 };
 use cascade::cascade;
 use crate::{
     config::Config,
     sync::{
-        login, register, get_bookmarks, Bookmark
+        login, register, get_bookmarks
     }
 };
 
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const SYNC_POPOVER_HEIGHT: i32 = 200;
+const SYNC_POPOVER_HEIGHT: i32 = 235;
 const BM_POPOVER_HEIGHT: i32 = 400;
 const POPUP_WIDTH: i32 = 250;
 const POPUP_HEIGHT: i32 = 100;
 
-static mut MSG_QUEUE: Option<Vec<(String, String)>> = None;
+pub static mut MSG_QUEUE: Option<Vec<(String, String)>> = None;
 
 /* Unused plugin functions */
 
@@ -204,6 +202,9 @@ fn create_sync_menu() -> MenuButton {
         btn_box.pack_start(&reg_btn, true, true, 0);
         btn_box.pack_start(&login_btn, true, true, 0);
         sync_box.pack_start(&btn_box, false, false, 0);
+
+        let pword_change_btn = Button::builder().label("Request Password Change").build();
+        sync_box.pack_start(&pword_change_btn, false, false, 0);
 
         // Handle login/registration
         let reg_email = email.clone();
@@ -464,80 +465,34 @@ fn create_bm_menu() -> MenuButton {
         }
 
         // Try to sync
-        let bookmarks = match get_bookmarks() {
+        let bm_col = match get_bookmarks() {
             Err(err) => {
                 println!("Failed to sync bookmarks: {} Contiuing local", err);
                 let cfg = Config::get_global();
-                cfg.bm_collection.bookmarks
+                cfg.bm_collection
             }, Ok(bm_collection) => {
                 let mut cfg = Config::get_global();
                 cfg.bm_collection = bm_collection.clone();
                 Config::set_global(cfg);
                 Config::store_global();
 
-                bm_collection.bookmarks
+                bm_collection
             }
         };
 
-        // Build menu
-        let mut folders: HashMap<String, Vec<Bookmark>> = HashMap::new();
-
-        // Sort bookmarks into folders
-        for bookmark in bookmarks.clone() {
-            if !bookmark.folder.is_none() {
-                let folder_name = bookmark.folder.clone().unwrap();
-                if !folders.contains_key(&folder_name.clone()) {
-                    folders.insert(folder_name.clone(), Vec::new());
-                }
-                let mut bms = folders[&folder_name.clone()].clone();
-                bms.push(bookmark.clone());
-                folders.insert(folder_name.clone(), bms.clone());
-            }
-        }
-
         // Add folders first
-        for (name, bms) in folders {
-            let fldr = MenuItem::builder()
-                .label(&name.clone())
-                .hexpand(true).vexpand(false)
-                .build();
-            let fldr_menu = Menu::builder().build();
-            for bm in bms {
-                let bm_item = MenuItem::builder()
-                    .label(&bm.name.clone())
-                    .hexpand(true).vexpand(false)
-                    .build();
-                let name_clone = bm.name.clone();
-                bm_item.connect_activate(move |_menu_item| {
-                    unsafe {
-                        if MSG_QUEUE.clone().is_none() {
-                            MSG_QUEUE = Some(Vec::new())
-                        }
-                        let mut queue = MSG_QUEUE.clone().unwrap();
-                        queue.push((
-                            String::from("WEBKIT_REDIRECT"),
-                            name_clone.clone()
-                        ));
-                        MSG_QUEUE = Some(queue);
-                    }
-                });
-                fldr_menu.append(&bm_item);
-            }
-            fldr.set_submenu(Some(&fldr_menu));
-            bm_menu.add(&fldr);
+        let subfldr_items = bm_col.get_subfldr_menu_item();
+        for fldr_item in subfldr_items.iter() {
+            bm_menu.add(fldr_item);
         }
 
         // Now add the regular bookmarks
-        for bookmark in bookmarks {
-            if !bookmark.folder.is_none() {
-                continue;
-            }
-
+        for bookmark in bm_col.bms {
             let bm = MenuItem::builder()
-                .label(&bookmark.name)
+                .label(&bookmark.0)
                 .hexpand(true).vexpand(false)
                 .build();
-            let name_clone = bookmark.name.clone();
+            let name_clone = bookmark.0.clone();
             bm.connect_activate(move |_menu_item| {
                 unsafe {
                     if MSG_QUEUE.clone().is_none() {

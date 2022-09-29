@@ -30,8 +30,9 @@ impl Default for Config {
             pword: String::new(),
             logged_in: false,
             bm_collection: BookmarkCollection {
-                user_email: String::new(),
-                bookmarks: Vec::new()
+                name: String::new(),
+                bms: Vec::new(),
+                subfldrs: Vec::new()
             }
         }
     }
@@ -41,11 +42,11 @@ impl Config {
     pub fn get_global() -> Config {
         unsafe {
             if CONFIG.is_none() {
-                match load("SWB_BOOKMARKS") {
+                match load("swb_bookmarks") {
                     Err(err) => {
                         println!("Error '{}' in config! Using defaults.", err);
                         CONFIG = Some(Config::default());
-                        store("SWB_BOOKMARKS", CONFIG.clone().unwrap())
+                        store("swb_bookmarks", CONFIG.clone().unwrap())
                             .unwrap();
                     }, Ok(config) => CONFIG = Some(config)
                 }
@@ -65,7 +66,7 @@ impl Config {
         unsafe {
             let mut cfg = CONFIG.clone().unwrap();
             cfg.logged_in = false; // Never log in by default
-            store("SWB_BOOKMARKS", cfg).unwrap();
+            store("swb_bookmarks", cfg).unwrap();
         }
     }
 }
