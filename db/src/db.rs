@@ -230,7 +230,7 @@ pub async fn request_password_reset(
 
     // Check for and remove previous requests
     let filter = doc! {
-        "email": email_txt
+        "user_email": email_txt
     };
     reset_requests.delete_many(filter, None).await?;
 
@@ -257,7 +257,7 @@ pub async fn change_password(
 
     // Get the request code
     let filter = doc! {
-        "email": email_txt
+        "user_email": email_txt
     };
     let req = reset_requests.find_one(filter, None).await?;
 
