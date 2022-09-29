@@ -19,14 +19,15 @@ use cascade::cascade;
 use crate::{
     config::Config,
     sync::{
-        login, register, get_bookmarks
+        login, register, get_bookmarks,
+        request_pword_reset, reset_password
     }
 };
 
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const SYNC_POPOVER_HEIGHT: i32 = 235;
+const SYNC_POPOVER_HEIGHT: i32 = 215;
 const BM_POPOVER_HEIGHT: i32 = 400;
 const POPUP_WIDTH: i32 = 250;
 const POPUP_HEIGHT: i32 = 100;
@@ -203,8 +204,23 @@ fn create_sync_menu() -> MenuButton {
         btn_box.pack_start(&login_btn, true, true, 0);
         sync_box.pack_start(&btn_box, false, false, 0);
 
-        let pword_change_btn = Button::builder().label("Request Password Change").build();
-        sync_box.pack_start(&pword_change_btn, false, false, 0);
+        let reset_req_btn = Button::builder().label("Request Password Change").build();
+        sync_box.pack_start(&reset_req_btn, false, false, 0);
+
+        let reset_code_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true).margin_bottom(DEF_MARGIN)
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+            .build();
+        let reset_code_label = Label::builder()
+            .label("Reset Code:").margin_end(DEF_MARGIN).halign(Align::Start)
+            .build();
+        let reset_code = Entry::builder().hexpand(true).visibility(false).build();
+        reset_code_box.pack_start(&reset_code_label, false, false, 0);
+        reset_code_box.pack_start(&reset_code, false, false, 0);
+        sync_box.pack_start(&reset_code_box, false, false, 0);
+        let reset_btn = Button::builder().label("Reset Password").build();
+        sync_box.pack_start(&reset_btn, false, false, 0);
 
         // Handle login/registration
         let reg_email = email.clone();
@@ -260,7 +276,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully registered user")
+                                    .text("Succesfully registered user.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -285,6 +301,7 @@ fn create_sync_menu() -> MenuButton {
                 }
             }
         });
+        
         let log_email = email.clone();
         let log_pword = pword.clone();
         let log_remem = remember.clone();
@@ -294,6 +311,87 @@ fn create_sync_menu() -> MenuButton {
             let pword_txt = log_pword.text().to_string();
             let log_res = login(&email_txt, &pword_txt);
             match log_res {
+                Err(err) => {
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Error")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text(&err.to_string())
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(|mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide()
+                        }
+                    });
+                    dialog.show_all();
+                }, Ok(()) => {
+                    // Show message confirming login
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Success")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text("Succesfully logged user in.")
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(move |mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide();
+                        }
+                    });
+                    dialog.show_all();
+
+                    let mut cfg = Config::get_global();
+
+                    // Save hashed password locally in config
+                    if log_remem.is_active() {
+                        cfg.stay_logged_in = true;
+                        cfg.email = email_txt.clone();
+                        cfg.pword = pword_txt.clone();
+                    }
+
+                    cfg.logged_in = true;
+                    Config::set_global(cfg);
+                    Config::store_global();
+
+                    log_popover_clone.hide();
+                }
+            }
+        });
+
+        let reset_req_email = email.clone();
+        reset_req_btn.connect_clicked(move |_btn| {
+            let email_txt = reset_req_email.text().to_ascii_lowercase();
+            let reset_res = request_pword_reset(&email_txt);
+            match reset_res {
                 Err(err) => {
                     let dialog = cascade! {
                         Dialog::builder()
@@ -339,7 +437,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully logged user in")
+                                    .text("Succesfully sent reset request.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -351,21 +449,76 @@ fn create_sync_menu() -> MenuButton {
                         }
                     });
                     dialog.show_all();
+                }
+            }
+        });
 
-                    let mut cfg = Config::get_global();
-
-                    // Save hashed password locally in config
-                    if log_remem.is_active() {
-                        cfg.stay_logged_in = true;
-                        cfg.email = email_txt.clone();
-                        cfg.pword = pword_txt.clone();
-                    }
-
-                    cfg.logged_in = true;
-                    Config::set_global(cfg);
-                    Config::store_global();
-
-                    log_popover_clone.hide();
+        let reset_email = email.clone();
+        let reset_pword = pword.clone();
+        let code = reset_code.clone();
+        reset_btn.connect_clicked(move |_btn| {
+            let email_txt = reset_email.text().to_ascii_lowercase();
+            let pword_txt = reset_pword.text();
+            let code_txt = code.text();
+            let reset_res = reset_password(&email_txt, &pword_txt, &code_txt);
+            match reset_res {
+                Err(err) => {
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Error")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text(&err.to_string())
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(|mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide()
+                        }
+                    });
+                    dialog.show_all();
+                }, Ok(()) => {
+                    // Show message confirming registration
+                    let dialog = cascade! {
+                        Dialog::builder()
+                            .title("Success")
+                            .width_request(POPUP_WIDTH)
+                            .height_request(POPUP_HEIGHT)
+                            .build();
+                            ..add_button("Close", ResponseType::Apply);
+                            ..set_modal(false);
+                            ..set_resizable(false);
+                    };
+                    dialog.content_area().pack_start(
+                        &TextView::builder()
+                            .editable(false)
+                            .buffer(
+                                &TextBuffer::builder()
+                                    .text("Succesfully reset password.")
+                                    .build()
+                            ).hexpand(true).vexpand(true).can_focus(false)
+                            .build(),
+                        true, true, DEF_MARGIN as u32
+                    );
+                    dialog.connect_response(move |mini_win, resp| {
+                        if resp == ResponseType::Apply {
+                            mini_win.hide();
+                        }
+                    });
+                    dialog.show_all();
                 }
             }
         });

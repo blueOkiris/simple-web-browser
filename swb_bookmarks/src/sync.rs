@@ -135,3 +135,40 @@ async fn get_bookmarks_async(
     }
 }
 
+pub fn request_pword_reset(email: &str) -> Result<(), Box<dyn Error>> {
+    let runtime = Runtime::new().unwrap();
+    let fut = request_pword_reset_async(email);
+    runtime.block_on(fut)
+}
+
+async fn request_pword_reset_async(email: &str) -> Result<(), Box<dyn Error>> {
+    let login_attempt_url = String::from("http://blueokiris.com:9420/req_pass_rst/") + email;
+    let attempt_res_text = get(login_attempt_url).await?.text().await?;
+
+    if attempt_res_text == "success" {
+        Ok(())
+    } else {
+        Err(format!("Error requesting reset request: {}", attempt_res_text).as_str().into())
+    }
+}
+
+pub fn reset_password(email: &str, new_password: &str, code: &str) -> Result<(), Box<dyn Error>> {
+    let runtime = Runtime::new().unwrap();
+    let fut = reset_password_async(email, new_password, code);
+    runtime.block_on(fut)
+}
+
+async fn reset_password_async(
+        email: &str, new_password: &str, code: &str) -> Result<(), Box<dyn Error>> {
+    let login_attempt_url =
+        String::from("http://blueokiris.com:9420/change_pass/") + email + "/" + code
+            + "/" + new_password;
+    let attempt_res_text = get(login_attempt_url).await?.text().await?;
+
+    if attempt_res_text == "success" {
+        Ok(())
+    } else {
+        Err(format!("Error reset request: {}", attempt_res_text).as_str().into())
+    }
+}
+
