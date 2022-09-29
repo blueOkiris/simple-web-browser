@@ -31,7 +31,7 @@ use rocket::futures::stream::TryStreamExt;
 const DB_LOGIN: [&'static str; 3] = [
     "mongodb://",
     ":",
-    "@blueokiris.com:27017"
+    "@127.0.0.1:27017"
 ];
 
 // For sending email code
@@ -85,7 +85,7 @@ struct PasswordChangeRequest {
     pub code: String
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BookmarkCollection {
     pub name: String,
     pub bms: Vec<(String, String)>,
@@ -194,7 +194,7 @@ pub async fn register(
     assert_valid_email(email_txt).await?;
 
     let db_login = String::from(DB_LOGIN[0]) + db_user + DB_LOGIN[1] + db_pword + DB_LOGIN[2];
-
+    
     // First do a check to see if the user exists
     let client = Client::with_uri_str(db_login).await?;
     let vr_db = client.database(DB);

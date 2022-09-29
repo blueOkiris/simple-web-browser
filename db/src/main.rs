@@ -11,15 +11,13 @@ mod db;
 
 use rocket::{
     routes, build, get, launch, Config,
-    Request, Response,
-    config::{LogLevel, TlsConfig},
-    http::Header,
-    fairing::{
-        Fairing, Info, Kind
-    }
+    config::LogLevel
 };
 use clap::{
     ArgMatches, command, arg
+};
+use serde_json::{
+    to_string, from_str
 };
 use crate::db::{
     register, login, request_password_reset, change_password,
@@ -31,27 +29,6 @@ const PORT: u16 = 9420;
 static mut DB_USER: String = String::new();
 static mut DB_PWORD: String = String::new();
 
-pub struct CORS;
-
-#[rocket::async_trait]
-impl Fairing for CORS {
-    fn info(&self) -> Info {
-        Info {
-            name: "Add CORS headers to responses",
-            kind: Kind::Response
-        }
-    }
-
-    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
-        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
-        response.set_header(Header::new(
-            "Access-Control-Allow-Methods", "POST, GET, PATCH, OPTIONS"
-        ));
-        response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
-        response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
-    }
-}
-
 #[launch]
 fn rocket() -> _ {
     let args = get_args();
@@ -60,13 +37,11 @@ fn rocket() -> _ {
         DB_PWORD = args.get_one::<String>("PASSWORD").unwrap().clone();
     }
 
+    // Just http, but not on a webpage, so who cares?
     let mut conf = Config::release_default();
     conf.port = PORT;
     conf.log_level = LogLevel::Debug;
     conf.address = "0.0.0.0".parse().unwrap();
-    conf.tls = Some(TlsConfig::from_paths(
-        "/etc/ssl/ca_bundle.crt", "/etc/ssl/private/private.key"
-    ));
 
     build().configure(conf).mount(
         "/", routes![
@@ -74,10 +49,10 @@ fn rocket() -> _ {
             login_user,
             request_reset_user_password,
             change_user_password,
-            get_user_bookmarks//,
-            //set_user_bookmarks
+            get_user_bookmarks,
+            set_user_bookmarks
         ]
-    ).attach(CORS)
+    )
 }
 
 fn get_args() -> ArgMatches {
@@ -97,8 +72,8 @@ async fn register_user(email: &str, password: &str) -> String {
     let (db_user, db_pword) = unsafe {
         (DB_USER.as_str(), DB_PWORD.as_str())
     };
-    let result = register(email, password, db_user, db_pword).await;
-    match result {
+
+    match register(email, password, db_user, db_pword).await {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
@@ -113,8 +88,8 @@ async fn login_user(email: &str, password: &str) -> String {
     let (db_user, db_pword) = unsafe {
         (DB_USER.as_str(), DB_PWORD.as_str())
     };
-    let result = login(email, password, db_user, db_pword).await;
-    match result {
+
+    match login(email, password, db_user, db_pword).await {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
@@ -129,8 +104,8 @@ async fn request_reset_user_password(email: &str) -> String {
     let (db_user, db_pword) = unsafe {
         (DB_USER.as_str(), DB_PWORD.as_str())
     };
-    let result = request_password_reset(email, db_user, db_pword).await;
-    match result {
+
+    match request_password_reset(email, db_user, db_pword).await {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
@@ -147,8 +122,8 @@ async fn change_user_password(email: &str, code: &str, new_pass: &str) -> String
     let (db_user, db_pword) = unsafe {
         (DB_USER.as_str(), DB_PWORD.as_str())
     };
-    let result = change_password(email, code, new_pass, db_user, db_pword).await;
-    match result {
+
+    match change_password(email, code, new_pass, db_user, db_pword).await {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
@@ -163,6 +138,7 @@ async fn get_user_bookmarks(email: &str, password: &str) -> String {
     let (db_user, db_pword) = unsafe {
         (DB_USER.as_str(), DB_PWORD.as_str())
     };
+
     match login(email, password, db_user, db_pword).await {
         Ok(_) => {},
         Err(err) => {
@@ -173,10 +149,54 @@ async fn get_user_bookmarks(email: &str, password: &str) -> String {
 
     match get_bookmark_collection(email, db_user, db_pword).await {
         Ok(bm_col) => {
-            String::new()
+            match to_string(&bm_col) {
+                Ok(bm_col_str) => String::from("success") + bm_col_str.as_str(),
+                Err(err) => {
+                    println!(
+                        "Failed to convert to JSON for user with email {}. Error: {}",
+                        email, err.to_string()
+                    );
+                    err.to_string()
+                }    
+            }
         }, Err(err) => {
             println!(
                 "Failed to get bookmarks for user with email {}. Error: {}", email, err.to_string()
+            );
+            err.to_string()
+        }
+    }
+}
+
+#[get("/set_bookmarks/<email>/<password>/<collection>")]
+async fn set_user_bookmarks(email: &str, password: &str, collection: &str) -> String {
+    let (db_user, db_pword) = unsafe {
+        (DB_USER.as_str(), DB_PWORD.as_str())
+    };
+
+    match login(email, password, db_user, db_pword).await {
+        Ok(_) => {},
+        Err(err) => {
+            println!("Failed to log in user with email {}. Error: {}", email, err.to_string());
+            return err.to_string();
+        }
+    }
+
+    match from_str(collection) {
+        Ok(bm_col) => match replace_bookmark_collection(email, bm_col, db_user, db_pword).await {
+            Ok(_) => {
+                String::from("success")
+            }, Err(err) => {
+                println!(
+                    "Failed to set bookmarks for user with email {}. Error: {}",
+                    email, err.to_string()
+                );
+                err.to_string()
+            }
+        }, Err(err) => {
+            println!(
+                "Failed to parse url bookmark string for user with email {}. Error: {}",
+                email, err.to_string()
             );
             err.to_string()
         }
