@@ -1,2 +1,0 @@
-echo "Creating soft links."
-ln -s /opt/swb/swb /usr/bin/swb

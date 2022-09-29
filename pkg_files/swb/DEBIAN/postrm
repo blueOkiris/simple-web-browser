@@ -1,3 +1,0 @@
-rm -rf /opt/swb
-rm -rf /usr/bin/swb
-cargo uninstall adblock-rust-server
