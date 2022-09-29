@@ -62,11 +62,19 @@ impl WebViewManager {
     fn web_view_load_failed(
             view: &WebView, _load_ev: LoadEvent, uri: &str,
             err: &Error) -> bool {
-        if err.message().contains(BAD_URL_MSG) { // Try searching instead
+        if err.message().contains(BAD_URL_MSG) {
+            if !uri.starts_with("http") && !uri.starts_with("file") {
+                // Try adding "https://" to the front
+                view.load_uri(&(String::from("https://") + uri));
+                return true;
+            }
+
+            // Try searching instead
             view.load_uri(&(String::from("https://duckduckgo.com/?q=") + uri));
             return true;
         } else if err.message().contains(NO_INTERNET_MSG) {
-            // TODO: Make a no internet page
+            view.load_html("<html> <body> No internet, sorry! </body> </html>", None);
+            return true;
         }
 
         // Otherwise let it handle itself and hope nothing glitches out

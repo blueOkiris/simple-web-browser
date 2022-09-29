@@ -7,6 +7,8 @@ use std::{
     fs::read_dir,
     sync::Arc
 };
+#[cfg(not(debug_assertions))]
+use dirs::config_dir;
 use dlopen_derive::WrapperApi;
 use dlopen::wrapper::{
     Container, WrapperApi

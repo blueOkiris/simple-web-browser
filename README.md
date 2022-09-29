@@ -27,6 +27,8 @@ First, install Dependencies:
 - webkit2gtk libs
 - gtk3 libs
 - pkgconf
+- gcc
+- Some kind of GUI editor like gedit set up so that blockit works correctly (otherwise it'll try to use wine notepad XD)
 - Linux
 
 To simply try it out, from the repo folder, run `cargo run`
@@ -37,7 +39,10 @@ If you want to install it somewhere:
 - Copy the binary "swb" from target/release to /usr/bin/
 - Create the folder `~/.config/swb`
 - Create a plugins/ folder in the install location, `~/.config/swb`, and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
-- Copy your adblock/ folder containing the blockit.so file into `~/.config/swb/` as well
+- Initialize the blockit submodule with `git submodule update --init --recursive`
+- Install blockit by running `sudo make -C blockit install`
+- Link /usr/local/lib/blockit.so file to `~/.config/swb/webkit`
+- Copy adblock-urls.txt to `~/.config/ars/urls` (rename it to "urls", not put it in a urls folder)
 - Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
 
 Again, once the package is made, it will do all that jazz for you
