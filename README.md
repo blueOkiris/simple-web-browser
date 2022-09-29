@@ -16,7 +16,7 @@ Goals:
 5. Private out of the box (no telemetry, ads, or data collection)
 6. Not built on Chromium (not hard)
 
-Supported platforms: Arch, Ubuntu 21.10
+Supported platforms: Fedora
 
 ## Build
 
