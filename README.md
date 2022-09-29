@@ -65,3 +65,4 @@ The actual main window contains:
 Events from the main window like searching or creating a bookmark call plugins to do the dirty work. To see what the plugin supports, look in `core/src/plugin.rs`
 
 The mobile app has yet to be thought about. Might go the easy route and just try to compile for WebAsm, create a webview wrapper for android, and get it to run in that, or I might try to actually make a new interface. Has not been decided yet.
+
