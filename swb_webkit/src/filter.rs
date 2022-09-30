@@ -29,7 +29,6 @@ use gtk::{
 };
 use dirs::config_dir;
 use webkit2gtk_sys::{
-    webkit_user_content_filter_store_new,
     webkit_user_content_filter_store_load,
     webkit_user_content_filter_store_load_finish,
     webkit_user_content_filter_store_save,
@@ -43,40 +42,11 @@ use webkit2gtk::{
 };
 use reqwest::get;
 use tokio::runtime::Runtime;
+use crate::manager::WEB_VIEW_MANAGER;
 
 const BLOCK_LIST_IDENT: *const i8 = "blocklist\0".as_ptr() as *const i8;
 const DATA_URL: &'static str =
     "https://easylist-downloads.adblockplus.org/easylist_min_content_blocker.json";
-
-static mut GLOBAL_FILTER_STORE: FilterStore = FilterStore {
-    store: None
-};
-
-struct FilterStore {
-    store: Option<*mut WebKitUserContentFilterStore>
-}
-
-impl FilterStore {
-    pub fn get(&mut self) -> *mut WebKitUserContentFilterStore {
-        if self.store.is_none() {
-            let mut conf = config_dir().unwrap();
-            conf.push("swb");
-            conf.push("adblock");
-            conf.push("filter_store\0");
-            let store_path = conf.as_os_str().to_str().unwrap().as_ptr() as *const i8;
-
-            println!(
-                "Creating filter store. Cache located at {}", conf.as_os_str().to_str().unwrap()
-            );
-
-            self.store = unsafe {
-                Some(webkit_user_content_filter_store_new(store_path))        
-            }
-        }
-
-        self.store.clone().unwrap()
-    }
-}
 
 pub fn add_filter(web_view: &WebView) {
     println!("Adding filter to content manager.");
@@ -84,7 +54,7 @@ pub fn add_filter(web_view: &WebView) {
     let con_man = web_view.user_content_manager(); 
     let con_man_ptr: *mut WebKitUserContentManager = con_man.as_ref().to_glib_none().0;
     let filter_store = unsafe {
-        GLOBAL_FILTER_STORE.get()
+        WEB_VIEW_MANAGER.get_filter_store()
     };
 
     unsafe {
@@ -135,7 +105,7 @@ pub fn update_filter(web_view: &WebView) {
     let con_man = web_view.user_content_manager(); 
     let con_man_ptr: *mut WebKitUserContentManager = con_man.as_ref().to_glib_none().0;
     let filter_store = unsafe {
-        GLOBAL_FILTER_STORE.get()
+        WEB_VIEW_MANAGER.get_filter_store()
     };
 
     let fl_buff = get_filter_list();

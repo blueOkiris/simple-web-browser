@@ -12,6 +12,11 @@ use webkit2gtk::{
     Error,
     traits::WebViewExt
 };
+use webkit2gtk_sys::{
+    WebKitUserContentFilterStore,
+    webkit_user_content_filter_store_new
+};
+use dirs::config_dir;
 
 const BAD_URL_MSG: &'static str = "The URL can’t be shown";
 const NO_INTERNET_MSG: &'static str = "Temporary failure in name resolution";
@@ -21,7 +26,8 @@ pub static mut WEB_VIEW_MANAGER: WebViewManager = WebViewManager {
     view_parent: None,
     history: Vec::new(),
     curr_page: 0,
-    internal_navigation: false
+    internal_navigation: false,
+    filter_store: None
 };
 
 pub struct WebViewManager {
@@ -29,7 +35,8 @@ pub struct WebViewManager {
     pub view_parent: Option<Box>,
     pub history: Vec<String>,
     pub curr_page: usize,
-    pub internal_navigation: bool
+    pub internal_navigation: bool,
+    filter_store: Option<*mut WebKitUserContentFilterStore>
 }
 
 impl WebViewManager {
@@ -42,8 +49,29 @@ impl WebViewManager {
             view_parent: Some(view_parent),
             history: Vec::new(),
             curr_page: 0,
-            internal_navigation: false
+            internal_navigation: false,
+            filter_store: None
         }
+    }
+
+    pub fn get_filter_store(&mut self) -> *mut WebKitUserContentFilterStore {
+        if self.filter_store.is_none() {
+            let mut conf = config_dir().unwrap();
+            conf.push("swb");
+            conf.push("adblock");
+            conf.push("filter_store\0");
+            let store_path = conf.as_os_str().to_str().unwrap().as_ptr() as *const i8;
+
+            println!(
+                "Creating filter store. Cache located at {}", conf.as_os_str().to_str().unwrap()
+            );
+
+            self.filter_store = unsafe {
+                Some(webkit_user_content_filter_store_new(store_path))        
+            }
+        }
+
+        self.filter_store.clone().unwrap()
     }
 
     // Static handler for page change. Unsafe but only used internally here
