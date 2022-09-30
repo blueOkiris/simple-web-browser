@@ -92,7 +92,7 @@ async fn login_user(email: &str, password: &str) -> String {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
-            println!("Failed to register user with email {}. Error: {}", email, err.to_string());
+            println!("Failed to login user with email {}. Error: {}", email, err.to_string());
             err.to_string()
         }
     }
