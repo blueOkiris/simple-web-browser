@@ -4,7 +4,8 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-webkit2gtk = { version = "0.18.0", features = [ "v2_16" ] }
+webkit2gtk-sys = { version = "0.18.0", features = [ "v2_16", "v2_24" ] }
+webkit2gtk = { version = "0.18.0", features = [ "v2_16", "v2_24" ] }
 gtk = "0.15.4"
 dirs = "4.0.0"
 

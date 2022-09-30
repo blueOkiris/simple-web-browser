@@ -1,6 +1,6 @@
 /*
  * Author: Dylan Turner
- * Description: Browser plugin for swb that uses Webkit Gtk
+ * Description: Plugin for swb that adds bookmark functionality
  */
 
 mod sync;

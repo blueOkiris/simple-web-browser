@@ -1,9 +1,10 @@
 /*
  * Author: Dylan Turner
- * Description: Browser plugin for swb that uses Webkit Gtk
+ * Description: Browser plugin for swb that uses Webkit Gtk and adblock
  */
 
 mod manager;
+mod filter;
 
 use webkit2gtk::{
     WebView, WebContext,
@@ -18,8 +19,11 @@ use gtk::{
     }
 };
 use dirs::config_dir;
-use crate::manager::{
-    WEB_VIEW_MANAGER, WebViewManager
+use crate::{
+    filter::add_filter,
+    manager::{
+        WEB_VIEW_MANAGER, WebViewManager
+    }
 };
 
 const NAME: &'static str = "Swb Webkit";
@@ -64,6 +68,7 @@ pub fn on_window_content_load(content: &Box) {
  
     // Create the view
     let web_view = WebView::builder().web_context(&web_ctx).build();
+    add_filter(&web_view);
     web_view.load_uri(START_PAGE);
     content.pack_start(&web_view.clone(), true, true, 0);
 
@@ -132,6 +137,7 @@ fn create_private_button() -> ToggleButton {
         let web_view = WebView::builder()
             .is_ephemeral(toggle.is_active()).web_context(&web_ctx)
             .build();
+        add_filter(&web_view);
         web_view.load_uri(START_PAGE);
 
         // Get parent and replace old web view with the new one
@@ -158,10 +164,6 @@ fn create_private_button() -> ToggleButton {
 fn create_settings_manager() -> Button {
     // Create a mini web view in our menu to manage blockit
     let web_ctx = WebContext::builder().build(); // Add adblock here as well
-    let mut conf = config_dir().unwrap();
-    conf.push("swb");
-    conf.push("webkit");
-    web_ctx.set_web_extensions_directory(conf.as_os_str().to_str().unwrap());
     let viewer = WebView::builder().web_context(&web_ctx).build();
 
     // Don't draw or anything as it starts up in a separate window
