@@ -9,17 +9,17 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
-1. [x] - Built with GTK/Qt to integrate with DEs
+1. Built with GTK/Qt to integrate with DEs (using gtk3 and webkitgtk)
 2. The following "extra" features I consider necessary (but nothing else):
-  - [x] - Adblock
-  - [ ] - Bookmark sync (working on)
-  - [ ] - Password sync and autofill
-3. [ ] - Mobile client
-4. [x] - Decent performance (built on top 3 engines: Blink, Gecko, or WebKit). WebKit currently.
-5. Private out of the box (no telemetry, ads, or data collection) - [x]
-6. Not built on Chromium (not hard) - [x]
+  - Adblock (done)
+  - Bookmark sync (currently working on)
+  - Password sync and autofill (not started)
+3. Mobile client (not started)
+4. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit currently)
+5. No added privacy concerns out of the box (no telemetry, ads, or data collection)
+6. Not built on Chromium/Blink (it's WebKit, so we're good)
 
-Officially supported platforms: Fedora
+Officially supported platforms: Fedora. Will probably make a Flatpak.
 
 ## Build
 
