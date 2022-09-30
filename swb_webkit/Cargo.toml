@@ -8,6 +8,8 @@ webkit2gtk-sys = { version = "0.18.0", features = [ "v2_16", "v2_24" ] }
 webkit2gtk = { version = "0.18.0", features = [ "v2_16", "v2_24" ] }
 gtk = "0.15.4"
 dirs = "4.0.0"
+reqwest = "0.11.9"
+tokio = "1.17.0"
 
 [lib]
 name = "swb_webkit"

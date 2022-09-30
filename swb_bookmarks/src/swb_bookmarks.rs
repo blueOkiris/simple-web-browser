@@ -27,7 +27,7 @@ use crate::{
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const SYNC_POPOVER_HEIGHT: i32 = 215;
+const SYNC_POPOVER_HEIGHT: i32 = 200;
 const BM_POPOVER_HEIGHT: i32 = 400;
 const POPUP_WIDTH: i32 = 250;
 const POPUP_HEIGHT: i32 = 100;

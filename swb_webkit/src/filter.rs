@@ -7,12 +7,14 @@
  */
 
 use std::{
+    error::Error,
     ptr::null,
     ffi::{
         c_void, CStr
-    }, fs::File,
-    io::{
-        Read, BufReader, Error        
+    }, fs::{
+        File, create_dir_all, write
+    }, io::{
+        Read, BufReader      
     }
 };
 use gtk::{
@@ -25,6 +27,7 @@ use gtk::{
         GAsyncResult, GCancellable    
     }
 };
+use dirs::config_dir;
 use webkit2gtk_sys::{
     webkit_user_content_filter_store_new,
     webkit_user_content_filter_store_load,
@@ -34,22 +37,59 @@ use webkit2gtk_sys::{
 use webkit2gtk::{
     WebView, WebViewExt
 };
+use reqwest::get;
+use tokio::runtime::Runtime;
 
-const FILTER_FILE: *const i8 = "filter_cache".as_ptr() as *const i8;
 const BLOCK_LIST_IDENT: *const i8 = "blocklist".as_ptr() as *const i8;
-const DATA_FILE: &'static str = "easylist.json";
+const DATA_URL: &'static str =
+    "https://easylist-downloads.adblockplus.org/easylist_min_content_blocker.json";
 
 pub fn add_filter(web_view: &WebView) {
     let con_man = web_view.user_content_manager();
-
+    let mut conf = config_dir().unwrap();
+    conf.push("swb");
+    conf.push("adblock");
+    let store_path = String::from(conf.as_os_str().to_str().unwrap()) + "/filter_store";
+    let store_path = store_path.as_str().as_ptr() as *const i8;
     unsafe {
         let con_man_ptr: *mut WebKitUserContentManager = con_man.as_ref().to_glib_none().0;
-        let filter_store = webkit_user_content_filter_store_new(FILTER_FILE);
+        let filter_store = webkit_user_content_filter_store_new(store_path);
         webkit_user_content_filter_store_load(
             filter_store, BLOCK_LIST_IDENT, null::<GCancellable>() as *mut _,
             Some(filter_load_callback), con_man_ptr as *mut c_void
         );
     
+    }
+}
+
+pub fn update_filter(web_view: &WebView) {
+    let con_man = web_view.user_content_manager();
+
+    let mut conf = config_dir().unwrap();
+    conf.push("swb");
+    conf.push("adblock");
+    let store_path = String::from(conf.as_os_str().to_str().unwrap()) + "/filter_store";
+    let store_path = store_path.as_str().as_ptr() as *const i8;
+
+    let fl_buff = get_filter_list();
+    if fl_buff.is_err() {
+        println!(
+           "Failed to load filter list! Error: {}.\nIgnoring.",
+           fl_buff.as_ref().err().unwrap().to_string()
+        );
+        return;
+    }
+    let fl_buff = fl_buff.unwrap();
+    let fl_data = fl_buff.as_ptr();
+
+    unsafe {
+        let fl_arr = g_bytes_new(fl_data as *const c_void, fl_buff.len());
+        let filter_store = webkit_user_content_filter_store_new(store_path);
+        let con_man_ptr: *mut WebKitUserContentManager = con_man.as_ref().to_glib_none().0;
+        webkit_user_content_filter_store_save(
+            filter_store, BLOCK_LIST_IDENT, fl_arr, null::<GCancellable>() as *mut _,
+            Some(filter_save_callback), con_man_ptr as *mut _
+        );
     }
 }
 
@@ -86,8 +126,33 @@ unsafe extern "C" fn filter_load_callback(
     }
 }
 
-fn get_filter_list() -> Result<Vec<u8>, Error> {
-    let filter_list = File::open(DATA_FILE)?;
+async fn download_filter_list() -> Result<String, Box<dyn Error>> {
+    let text = get(DATA_URL).await?.text().await?;
+    Ok(text)
+}
+
+fn save_filter_list_to_file() -> Result<String, Box<dyn Error>> {
+    let runtime = Runtime::new().unwrap();
+    let resp = runtime.block_on(download_filter_list())?;
+
+    let mut conf = config_dir().unwrap();
+    conf.push("swb");
+    conf.push("adblock");
+
+    if !conf.clone().exists() {
+        create_dir_all(conf.clone())?;
+    }
+
+    let file_name = String::from(conf.as_os_str().to_str().unwrap()) + "/easylist.txt";
+    write(file_name.clone(), resp)?;
+
+    Ok(file_name)
+}
+
+fn get_filter_list() -> Result<Vec<u8>, Box<dyn Error>> {
+    let file_name = save_filter_list_to_file()?;
+
+    let filter_list = File::open(file_name)?;
     let mut filter_list_reader = BufReader::new(filter_list);
     let mut filter_list_buff = Vec::new();
     filter_list_reader.read_to_end(&mut filter_list_buff)?;

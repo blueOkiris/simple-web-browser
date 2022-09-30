@@ -20,8 +20,9 @@ use gtk::{
 };
 use dirs::config_dir;
 use crate::{
-    filter::add_filter,
-    manager::{
+    filter::{
+        add_filter, update_filter
+    }, manager::{
         WEB_VIEW_MANAGER, WebViewManager
     }
 };
@@ -114,8 +115,16 @@ pub fn on_navbar_load(navbar: &Box) {
     let private_btn = create_private_button();
     navbar.add(&private_btn);
 
-    let settings_mgr = create_settings_manager();
-    navbar.add(&settings_mgr);
+    let adblock_refresh_btn = Button::builder()
+        .label("⯃").margin_start(DEF_MARGIN)
+        .tooltip_text("Update Content Filter")
+        .build();
+    adblock_refresh_btn.connect_clicked(|_btn| {
+        unsafe {
+            update_filter(&WEB_VIEW_MANAGER.web_view.clone().unwrap());
+        }
+    });
+    navbar.add(&adblock_refresh_btn);
 }
 
 fn create_private_button() -> ToggleButton {
@@ -161,20 +170,3 @@ fn create_private_button() -> ToggleButton {
     private_btn
 }
 
-fn create_settings_manager() -> Button {
-    // Create a mini web view in our menu to manage blockit
-    let web_ctx = WebContext::builder().build(); // Add adblock here as well
-    let viewer = WebView::builder().web_context(&web_ctx).build();
-
-    // Don't draw or anything as it starts up in a separate window
-
-    let adblock_starter = Button::builder()
-        .label("⯃").margin_start(DEF_MARGIN)
-        .tooltip_text("AdBlock Settings Window")
-        .build();
-    adblock_starter.connect_clicked(move |_btn| {
-        viewer.load_uri("blockit://settings");
-    });
-    
-    adblock_starter
-}
