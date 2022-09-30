@@ -9,14 +9,17 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
-1. Built with GTK/Qt to integrate with DEs
-2. Adblock and Password/Bookmark sync and autofill, but nothing more
-3. Mobile client
-4. Decent performance (built on top 3 engines: Blink, Gecko, or Webkit)
-5. Private out of the box (no telemetry, ads, or data collection)
-6. Not built on Chromium (not hard)
+1. [x] - Built with GTK/Qt to integrate with DEs
+2. The following "extra" features I consider necessary (but nothing else):
+  - [x] - Adblock
+  - [ ] - Bookmark sync (working on)
+  - [ ] - Password sync and autofill
+3. [ ] - Mobile client
+4. [x] - Decent performance (built on top 3 engines: Blink, Gecko, or WebKit). WebKit currently.
+5. Private out of the box (no telemetry, ads, or data collection) - [x]
+6. Not built on Chromium (not hard) - [x]
 
-Supported platforms: Fedora
+Officially supported platforms: Fedora
 
 ## Build
 
@@ -27,22 +30,15 @@ First, install Dependencies:
 - webkit2gtk libs
 - gtk3 libs
 - pkgconf
-- gcc
-- Some kind of GUI editor like gedit set up so that blockit works correctly (otherwise it'll try to use wine notepad XD)
 - Linux
 
 To simply try it out, from the repo folder, run `cargo run`
 
 If you want to install it somewhere:
 - Build with `cargo build --release`
-- Install adblock-rust-server via `cargo install adblock-rust-server`. Make sure `~/.cargo/bin/` is in your PATH
 - Copy the binary "swb" from target/release to /usr/bin/
 - Create the folder `~/.config/swb`
 - Create a plugins/ folder in the install location, `~/.config/swb`, and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
-- Initialize the blockit submodule with `git submodule update --init --recursive`
-- Install blockit by running `sudo make -C blockit install`
-- Link /usr/local/lib/blockit.so file to `~/.config/swb/webkit`
-- Copy adblock-urls.txt to `~/.config/ars/urls` (rename it to "urls", not put it in a urls folder)
 - Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
 
 Again, once the package is made, it will do all that jazz for you
@@ -58,8 +54,10 @@ Want a different adblock? Go for it
 Want to switch to a completely different browser engine? Be my guest!
 
 The default system will use:
-- Custom password and bookmark sync
-- Blockit adblocker combined into a plugin with Webkit Gtk
+- An adblocker built on easylist
+- Bookmark sync to my personal server
+- Password sync on my personal server
+- WebKit Gtk
 
 The actual main window contains:
 - a container for the web page rendering
@@ -68,8 +66,9 @@ The actual main window contains:
 - a refresh button
 - a bookmarks menu including a folders system
 - a sync menu for loggin in/logging out
+- a button for updating the adblocker filter rules.
 
 Events from the main window like searching or creating a bookmark call plugins to do the dirty work. To see what the plugin supports, look in `core/src/plugin.rs`
 
-The mobile app has yet to be thought about. Might go the easy route and just try to compile for WebAsm, create a webview wrapper for android, and get it to run in that, or I might try to actually make a new interface. Has not been decided yet.
+The mobile app has yet to be thought about. Might try to compile for WebAsm, create a webview wrapper for android, and get it to run in that, or I might try to actually make a new interface. Has not been decided yet.
 
