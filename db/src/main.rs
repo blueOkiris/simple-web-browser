@@ -37,6 +37,11 @@ fn rocket() -> _ {
         DB_USER = args.get_one::<String>("USERNAME").unwrap().clone();
         DB_PWORD = args.get_one::<String>("PASSWORD").unwrap().clone();
         EMAIL_PWORD = args.get_one::<String>("EMAIL_PWORD").unwrap().clone();
+
+        println!(
+            "Logging in with:\n- Username '{}'\n- Password '{}'\n- Email Password: '{}'",
+            DB_USER, DB_PWORD, EMAIL_PWORD
+        );
     }
 
     // Just http, but not on a webpage, so who cares?
