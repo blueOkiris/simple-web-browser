@@ -9,7 +9,7 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
-1. Built with GTK/Qt to integrate with DEs (using gtk3 and webkitgtk)
+1. Built with GTK/Qt to integrate with DEs (using gtk3 and webkit2gtk)
 2. The following "extra" features I consider necessary (but nothing else):
    - Adblock (done)
    - Bookmark sync (currently working on)
