@@ -11,9 +11,9 @@ A Web Browser should be a Web Browser and nothing more, and it should integrate 
 Goals:
 1. Built with GTK/Qt to integrate with DEs (using gtk3 and webkitgtk)
 2. The following "extra" features I consider necessary (but nothing else):
-  - Adblock (done)
-  - Bookmark sync (currently working on)
-  - Password sync and autofill (not started)
+   - Adblock (done)
+   - Bookmark sync (currently working on)
+   - Password sync and autofill (not started)
 3. Mobile client (not started)
 4. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit currently)
 5. No added privacy concerns out of the box (no telemetry, ads, or data collection)
