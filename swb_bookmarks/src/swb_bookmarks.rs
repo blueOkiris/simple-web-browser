@@ -164,7 +164,7 @@ fn create_sync_menu() -> MenuButton {
             .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
             .build();
         let email_label = Label::builder()
-            .label("Email:         ")
+            .label("Email:        ")
             .margin_end(DEF_MARGIN).halign(Align::Start)
             .build();
         let email = Entry::builder().hexpand(true).build();
@@ -204,7 +204,9 @@ fn create_sync_menu() -> MenuButton {
         btn_box.pack_start(&login_btn, true, true, 0);
         sync_box.pack_start(&btn_box, false, false, 0);
 
-        let reset_req_btn = Button::builder().label("Request Password Change").build();
+        let reset_req_btn = Button::builder()
+            .label("Request Password Change")
+            .margin_bottom(DEF_MARGIN).hexpand(true).halign(Align::Center).build();
         sync_box.pack_start(&reset_req_btn, false, false, 0);
 
         let reset_code_box = Box::builder()
@@ -217,7 +219,7 @@ fn create_sync_menu() -> MenuButton {
             .build();
         let reset_code = Entry::builder().hexpand(true).visibility(false).build();
         reset_code_box.pack_start(&reset_code_label, false, false, 0);
-        reset_code_box.pack_start(&reset_code, false, false, 0);
+        reset_code_box.pack_start(&reset_code, true, true, 0);
         sync_box.pack_start(&reset_code_box, false, false, 0);
         let reset_btn = Button::builder().label("Reset Password").build();
         sync_box.pack_start(&reset_btn, false, false, 0);
