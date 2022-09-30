@@ -2,6 +2,5 @@
 Type=Application
 Name=Simple Web Browser
 Icon=swb-icon
-Path=/opt/swb
-Exec=sh -c "PATH=$PATH:/opt/swb/adblock/ swb"
+Exec=/usr/bin/swb
 Terminal=false
