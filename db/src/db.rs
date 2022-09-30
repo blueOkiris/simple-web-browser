@@ -44,7 +44,6 @@ const PWORD_CHANGE_COLL: &'static str = "password_change_requests";
 
 // For sending email code
 const EMAIL_EMAIL: &'static str = "vid.rooms.no.reply@gmail.com";
-const EMAIL_PWORD: &'static str = "saeosbzdrasmfhra";
 const EMAIL_SMTP: &'static str = "smtp.gmail.com";
 
 #[derive(Serialize, Deserialize)]
@@ -217,7 +216,8 @@ pub async fn register(
 
 // Send a password reset request for the user
 pub async fn request_password_reset(
-        email_txt: &str, db_user: &str, db_pword: &str) -> Result<(), Box<dyn Error>> {
+        email_txt: &str,
+        db_user: &str, db_pword: &str, email_pword: &str) -> Result<(), Box<dyn Error>> {
     let db_login = String::from(DB_LOGIN[0]) + db_user + DB_LOGIN[1] + db_pword + DB_LOGIN[2];
 
     let client = Client::with_uri_str(db_login).await?;
@@ -226,7 +226,7 @@ pub async fn request_password_reset(
 
     // Create code for reset request and send it to the user
     let code = get_random_salt();
-    send_reset_email(email_txt.clone(), code.clone().as_str()).await?;
+    send_reset_email(email_txt, code.clone().as_str(), email_pword).await?;
 
     // Check for and remove previous requests
     let filter = doc! {
@@ -404,7 +404,8 @@ fn get_hash(msg: &str) -> String {
 }
 
 // Send an email with a password reset code
-async fn send_reset_email(user_email: &str, code: &str) -> Result<(), Box<dyn Error>> {
+async fn send_reset_email(
+        user_email: &str, code: &str, email_pword: &str) -> Result<(), Box<dyn Error>> {
     println!("Sending email to {}", user_email);
 
     println!("Creating email to send to {}.", user_email);
@@ -418,7 +419,7 @@ async fn send_reset_email(user_email: &str, code: &str) -> Result<(), Box<dyn Er
 
     println!("Create mailer.");
     let mut mailer = SmtpClient::new_simple(EMAIL_SMTP)?
-        .credentials(Credentials::new(EMAIL_EMAIL.into(), EMAIL_PWORD.into()))
+        .credentials(Credentials::new(EMAIL_EMAIL.into(), email_pword.into()))
         .transport();
 
     println!("Send it.");

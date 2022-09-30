@@ -28,6 +28,7 @@ const PORT: u16 = 9420;
 
 static mut DB_USER: String = String::new();
 static mut DB_PWORD: String = String::new();
+static mut EMAIL_PWORD: String = String::new();
 
 #[launch]
 fn rocket() -> _ {
@@ -35,6 +36,7 @@ fn rocket() -> _ {
     unsafe {
         DB_USER = args.get_one::<String>("USERNAME").unwrap().clone();
         DB_PWORD = args.get_one::<String>("PASSWORD").unwrap().clone();
+        EMAIL_PWORD = args.get_one::<String>("EMAIL_PWORD").unwrap().clone();
     }
 
     // Just http, but not on a webpage, so who cares?
@@ -58,13 +60,10 @@ fn rocket() -> _ {
 fn get_args() -> ArgMatches {
     command!()
         .about("Database server for simple web browser.")
-        .arg(
-            arg!(<USERNAME> "Server admin username")
-                .required(true)
-        ).arg(
-            arg!(<PASSWORD> "Server admin password")
-                .required(true)
-        ).get_matches()
+        .arg(arg!(<USERNAME> "Server admin username").required(true))
+        .arg(arg!(<PASSWORD> "Server admin password").required(true))
+        .arg(arg!(<EMAIL_PWORD> "Password change request email password").required(true))
+        .get_matches()
 }
 
 #[get("/register/<email>/<password>")]
@@ -101,11 +100,11 @@ async fn login_user(email: &str, password: &str) -> String {
 
 #[get("/req_pass_rst/<email>")]
 async fn request_reset_user_password(email: &str) -> String {
-    let (db_user, db_pword) = unsafe {
-        (DB_USER.as_str(), DB_PWORD.as_str())
+    let (db_user, db_pword, email_pword) = unsafe {
+        (DB_USER.as_str(), DB_PWORD.as_str(), EMAIL_PWORD.as_str())
     };
 
-    match request_password_reset(email, db_user, db_pword).await {
+    match request_password_reset(email, db_user, db_pword, email_pword).await {
         Ok(_) => {
             String::from("success")
         }, Err(err) => {
