@@ -65,10 +65,9 @@ The actual main window contains:
 - a search bar
 - a refresh button
 - a bookmarks menu including a folders system
-- a sync menu for loggin in/logging out
+- a sync menu for logging in/logging out
 - a button for updating the adblocker filter rules.
 
 Events from the main window like searching or creating a bookmark call plugins to do the dirty work. To see what the plugin supports, look in `core/src/plugin.rs`
 
 The mobile app has yet to be thought about. Might try to compile for WebAsm, create a webview wrapper for android, and get it to run in that, or I might try to actually make a new interface. Has not been decided yet.
-
