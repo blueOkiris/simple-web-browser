@@ -278,7 +278,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully registered user.")
+                                    .text("Successfully registered user.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -358,7 +358,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully logged user in.")
+                                    .text("Successfully logged user in.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -439,7 +439,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully sent reset request.")
+                                    .text("Successfully sent reset request.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -509,7 +509,7 @@ fn create_sync_menu() -> MenuButton {
                             .editable(false)
                             .buffer(
                                 &TextBuffer::builder()
-                                    .text("Succesfully reset password.")
+                                    .text("Successfully reset password.")
                                     .build()
                             ).hexpand(true).vexpand(true).can_focus(false)
                             .build(),
@@ -622,7 +622,7 @@ fn create_bm_menu() -> MenuButton {
         // Try to sync
         let bm_col = match get_bookmarks() {
             Err(err) => {
-                println!("Failed to sync bookmarks: {} Contiuing local", err);
+                println!("Failed to sync bookmarks: {} Continuing local", err);
                 let cfg = Config::get_global();
                 cfg.bm_collection
             }, Ok(bm_collection) => {
