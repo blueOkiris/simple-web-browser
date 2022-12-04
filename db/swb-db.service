@@ -1,0 +1,11 @@
+[Unit]
+Description=Start the Simple Web Browser Bookmarks DB automatically on login. Assuming in /bin/swb-db
+
+[Service]
+Type=simple
+ExecStart=/bin/swb-db `cat /etc/swb-db/swb-db-accounts.txt`
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
