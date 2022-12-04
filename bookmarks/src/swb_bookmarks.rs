@@ -649,7 +649,7 @@ fn create_bm_menu() -> MenuButton {
                 .label(&bookmark.0)
                 .hexpand(true).vexpand(false)
                 .build();
-            let name_clone = bookmark.0.clone();
+            let url_clone = bookmark.1.clone();
             bm.connect_activate(move |_menu_item| {
                 unsafe {
                     if MSG_QUEUE.clone().is_none() {
@@ -658,7 +658,7 @@ fn create_bm_menu() -> MenuButton {
                     let mut queue = MSG_QUEUE.clone().unwrap();
                     queue.push((
                         String::from("WEBKIT_REDIRECT"),
-                        name_clone.clone()
+                        url_clone.clone()
                     ));
                     MSG_QUEUE = Some(queue);
                 }

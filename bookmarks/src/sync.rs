@@ -51,7 +51,7 @@ impl BookmarkCollection {
                     .label(&bm.0.clone())
                     .hexpand(true).vexpand(false)
                     .build();
-                let name_clone = bm.0.clone();
+                let url_clone = bm.1.clone();
                 bm_item.connect_activate(move |_menu_item| {
                     unsafe {
                         if MSG_QUEUE.clone().is_none() {
@@ -60,7 +60,7 @@ impl BookmarkCollection {
                         let mut queue = MSG_QUEUE.clone().unwrap();
                         queue.push((
                             String::from("WEBKIT_REDIRECT"),
-                            name_clone.clone()
+                            url_clone.clone()
                         ));
                         MSG_QUEUE = Some(queue);
                     }
