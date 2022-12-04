@@ -43,7 +43,7 @@ const FLDR_COLL: &'static str = "folders";
 const PWORD_CHANGE_COLL: &'static str = "password_change_requests";
 
 // For sending email code
-const EMAIL_EMAIL: &'static str = "vid.rooms.no.reply@gmail.com";
+const EMAIL_EMAIL: &'static str = "simple.web.browser.no.reply@gmail.com";
 const EMAIL_SMTP: &'static str = "smtp.gmail.com";
 
 #[derive(Serialize, Deserialize)]
