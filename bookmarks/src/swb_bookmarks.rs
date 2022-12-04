@@ -563,32 +563,48 @@ fn create_bm_menu() -> MenuButton {
         .build();
     popover_content.add(&bm_frame);
 
-    // Add control buttons
-    let add_btn = cascade! {
+    // Add control system
+    let name_hbox = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true).margin_bottom(DEF_MARGIN)
+        .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN).margin_top(DEF_MARGIN)
+        .build();
+    let name_label = Label::builder()
+        .label("Path:")
+        .margin_end(DEF_MARGIN).halign(Align::Start)
+        .build();
+    let name = Entry::builder().hexpand(true).build();
+    name_hbox.pack_start(&name_label, false, false, 0);
+    name_hbox.pack_start(&name, true, true, 0);
+    popover_content.pack_start(&name_hbox, false, false, 0);
+
+    let bm_hbox = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true).margin_bottom(DEF_MARGIN)
+        .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+        .build();
+    let bm_label = Label::builder()
+        .label("Bookmark Url:")
+        .margin_end(DEF_MARGIN).halign(Align::Start)
+        .build();
+    let url = Entry::builder().hexpand(true).margin_end(DEF_MARGIN).build();
+    let set_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("Add Bookmark")
+            .label("Set")
             .margin_top(DEF_MARGIN).margin_bottom(DEF_MARGIN)
             .build();
             ..connect_clicked(move |_btn| {
-                // TODO: Add bookmarks
+                // TODO: Add bookmark or edit
             });
     };
-    popover_content.add(&add_btn);
-
-    let edit_btn = cascade! {
-        Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("Edit Bookmark")
-            .margin_bottom(DEF_MARGIN)
-            .build();
-            ..connect_clicked(move |_btn| {
-                // TODO: Edit bookmarks
-            });
-    };
-    popover_content.add(&edit_btn);
+    bm_hbox.pack_start(&bm_label, false, false, 0);
+    bm_hbox.pack_start(&url, true, true, 0);
+    bm_hbox.pack_start(&set_btn, false, false, 0);
+    popover_content.pack_start(&bm_hbox, false, false, 0);
 
     let add_fldr_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("Add Folder")
+            .label("Add Folder At Path")
             .margin_bottom(DEF_MARGIN)
             .build();
             ..connect_clicked(move |_btn| {
@@ -599,10 +615,11 @@ fn create_bm_menu() -> MenuButton {
 
     let rm_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
-            .label("Remove Item")
+            .label("Remove Item At Path")
             .build();
             ..connect_clicked(move |_btn| {
                 // TODO: Remove bookmark or folder
+
             });
     };
     popover_content.add(&rm_btn);
