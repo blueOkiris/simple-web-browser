@@ -10,9 +10,7 @@ use gtk::{
         MenuShellExt, GtkMenuItemExt
     }
 };
-use serde_json::{
-    to_string, from_str
-};
+use serde_json::from_str;
 use serde::{
     Serialize, Deserialize
 };
@@ -22,6 +20,8 @@ use crate::{
     config::Config,
     MSG_QUEUE
 };
+
+const BM_SERVER: &'static str = "http://dylan-turner.mynetgear.com:9420/";
 
 // Copied from db/src/db.rs
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -83,7 +83,7 @@ pub fn login(email: &str, pword: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn login_async(email: &str, pword: &str) -> Result<(), Box<dyn Error>> {
-    let login_attempt_url = String::from("http://blueokiris.com:9420/login/") + email + "/" + pword;
+    let login_attempt_url = format!("{}/login/{}/{}", BM_SERVER, email, pword);
     let attempt_res_text = get(login_attempt_url).await?.text().await?;
 
     if attempt_res_text == "success" {
@@ -100,8 +100,7 @@ pub fn register(email: &str, pword: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn register_async(email: &str, pword: &str) -> Result<(), Box<dyn Error>> {
-    let reg_attempt_url =
-        String::from("http://blueokiris.com:9420/register/") + email + "/" + pword;
+    let reg_attempt_url = format!("{}/register/{}/{}", BM_SERVER, email, pword);
     let attempt_res_text = get(reg_attempt_url).await?.text().await?;
     if attempt_res_text == "success" {
         Ok(())
@@ -123,8 +122,7 @@ pub fn get_bookmarks() -> Result<BookmarkCollection, Box<dyn Error>> {
 
 async fn get_bookmarks_async(
         email: &str, pword: &str) -> Result<BookmarkCollection, Box<dyn Error>> {
-    let reg_attempt_url =
-        String::from("http://blueokiris.com:9420/bookmarks/") + email + "/" + pword;
+    let reg_attempt_url = format!("{}/bookmarks/{}/{}", BM_SERVER, email, pword);
     let attempt_res_text = get(reg_attempt_url).await?.text().await?;
     if attempt_res_text.starts_with("success") {
         let bm_str = attempt_res_text.split_at(7).1;
@@ -142,7 +140,7 @@ pub fn request_pword_reset(email: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn request_pword_reset_async(email: &str) -> Result<(), Box<dyn Error>> {
-    let login_attempt_url = String::from("http://blueokiris.com:9420/req_pass_rst/") + email;
+    let login_attempt_url = format!("{}/req_pass_rst/{}", BM_SERVER, email);
     let attempt_res_text = get(login_attempt_url).await?.text().await?;
 
     if attempt_res_text == "success" {
@@ -160,9 +158,9 @@ pub fn reset_password(email: &str, new_password: &str, code: &str) -> Result<(),
 
 async fn reset_password_async(
         email: &str, new_password: &str, code: &str) -> Result<(), Box<dyn Error>> {
-    let login_attempt_url =
-        String::from("http://blueokiris.com:9420/change_pass/") + email + "/" + code
-            + "/" + new_password;
+    let login_attempt_url = format!(
+        "{}/change_pass/{}/{}/{}", BM_SERVER, email, code, new_password
+    );
     let attempt_res_text = get(login_attempt_url).await?.text().await?;
 
     if attempt_res_text == "success" {
