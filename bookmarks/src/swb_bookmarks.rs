@@ -27,7 +27,7 @@ use crate::{
 const NAME: &'static str = "Swb Bookmarks";
 const DEF_MARGIN: i32 = 5;
 const POPOVER_WIDTH: i32 = 400;
-const SYNC_POPOVER_HEIGHT: i32 = 200;
+const SYNC_POPOVER_HEIGHT: i32 = 285;
 const BM_POPOVER_HEIGHT: i32 = 400;
 const POPUP_WIDTH: i32 = 250;
 const POPUP_HEIGHT: i32 = 100;
@@ -221,7 +221,9 @@ fn create_sync_menu() -> MenuButton {
         reset_code_box.pack_start(&reset_code_label, false, false, 0);
         reset_code_box.pack_start(&reset_code, true, true, 0);
         sync_box.pack_start(&reset_code_box, false, false, 0);
-        let reset_btn = Button::builder().label("Reset Password").build();
+        let reset_btn = Button::builder()
+            .margin_start(DEF_MARGIN).margin_end(DEF_MARGIN)
+            .label("Reset Password").build();
         sync_box.pack_start(&reset_btn, false, false, 0);
 
         // Handle login/registration
