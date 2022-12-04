@@ -41,7 +41,7 @@ pub fn load_plugins() -> Vec<Arc<Container<Plugin>>> {
         let mut conf = config_dir().unwrap();
         conf.push("swb");
         conf.push("plugins");
-        paths = read_dir(conf.as_os_str().to_str().unwrap());
+        paths = read_dir(conf.as_os_str().to_str().unwrap()).unwrap();
     }
     for path in paths {
         let fname = path.unwrap().path().display().to_string();
