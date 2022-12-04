@@ -126,6 +126,7 @@ impl BookmarkCollection {
     fn sort_bms(&mut self, bookmarks: &Vec<Bookmark>) {
         self.bms = bookmarks.iter().filter(|bm| bm.folder == self.name).collect::<Vec<_>>().iter()
             .map(|bm| (bm.name.clone(), bm.url.clone())).collect();
+        self.subfldrs.iter_mut().for_each(|fldr| fldr.sort_bms(bookmarks));
     }
 }
 
