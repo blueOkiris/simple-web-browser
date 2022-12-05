@@ -107,6 +107,11 @@ impl BookmarkCollection {
         }).collect();
         let mut fldrs = Vec::new();
         for subfldr in self.subfldrs.iter() {
+            fldrs.push(Folder {
+                user_email: String::from(email),
+                name: subfldr.name.clone(),
+                parent: self.name.clone()
+            });
             let (mut subsubfldrs, mut subbms) = subfldr.separate(email);
             bms.append(&mut subbms);
             fldrs.append(&mut subsubfldrs);
