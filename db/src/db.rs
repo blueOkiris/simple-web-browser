@@ -343,7 +343,7 @@ async fn replace_bookmarks(
         email: &str, new_bookmarks: &Vec<Bookmark>, db_login: &str) -> Result<(), Box<dyn Error>> {
     let client = Client::with_uri_str(db_login).await?;
     let bm_db = client.database(DB);
-    let bookmarks: Collection<Bookmark> = bm_db.collection(FLDR_COLL);
+    let bookmarks: Collection<Bookmark> = bm_db.collection(BM_COLL);
 
     // Delete all first
     let filter = doc! {
