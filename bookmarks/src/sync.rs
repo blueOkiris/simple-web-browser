@@ -74,6 +74,80 @@ impl BookmarkCollection {
 
         menu_items
     }
+
+    pub fn remove(&mut self, path: &str) -> Result<(), Box<dyn Error>> {
+        if path == "" {
+            Err("Error: Cannot remove empty path!")?
+        }
+
+        let pieces = path.split('/').collect::<Vec<&str>>();
+        if pieces.len() < 2 {
+            for i in 0..self.bms.len() {
+                if self.bms[i].0 == path {
+                    self.bms.remove(i);
+                    return Ok(());
+                }
+            }
+
+            for i in 0..self.subfldrs.len() {
+                if self.subfldrs[i].name == path {
+                    self.subfldrs.remove(i);
+                    return Ok(());
+                }
+            }
+        } else {
+            for i in 0..self.subfldrs.len() {
+                if self.subfldrs[i].name == pieces[0] {
+                    let mut subpath = String::new();
+                    for i in 1..pieces.len() {
+                        subpath.push_str(pieces[i]);
+                        subpath.push('/');
+                    }
+                    subpath.pop();
+
+                    return self.subfldrs[i].remove(subpath.as_str());
+                }
+            }
+        }
+
+        Err("Error: Invalid path provided!")?
+    }
+
+    /*
+     * Create a JSON representation of what the database stores bookmarks and stuff as
+     *
+     * Reference:
+     *   Collection: { name: String, bms <Vec(String, String)>, subfolders: Vec<Collection> }
+     */
+    pub fn to_string(&self) -> String {
+        let mut subfldrs = String::from("[");
+        for subfldr in self.subfldrs.iter() {
+            subfldrs.push_str(subfldr.to_string().as_str());
+            subfldrs.push(',');
+        }
+        if subfldrs.len() > 1 {
+            subfldrs.pop();
+        }
+        subfldrs.push(']');
+
+        let mut bms = String::from("[");
+        for bm in self.bms.iter() {
+            bms.push_str("[\"");
+            bms.push_str(bm.0.as_str());
+            bms.push_str("\",\"");
+            bms.push_str(bm.1.as_str());
+            bms.push_str("\"],");
+        }
+        if bms.len() > 1 {
+            bms.pop();
+        }
+        bms.push(']');
+        
+        format!(
+            "{{\"name\":\"{}\",\"bms\":{},\"subfldrs\":{}}}",
+            self.name, bms, subfldrs
+        ).replace("https://", "")
+    }
 }
 
 pub fn login(email: &str, pword: &str) -> Result<(), Box<dyn Error>> {
@@ -122,14 +196,38 @@ pub fn get_bookmarks() -> Result<BookmarkCollection, Box<dyn Error>> {
 
 async fn get_bookmarks_async(
         email: &str, pword: &str) -> Result<BookmarkCollection, Box<dyn Error>> {
-    let reg_attempt_url = format!("{}/bookmarks/{}/{}", BM_SERVER, email, pword);
-    let attempt_res_text = get(reg_attempt_url).await?.text().await?;
+    let bm_lookup_attempt_url = format!("{}/bookmarks/{}/{}", BM_SERVER, email, pword);
+    let attempt_res_text = get(bm_lookup_attempt_url).await?.text().await?;
     if attempt_res_text.starts_with("success") {
         let bm_str = attempt_res_text.split_at(7).1;
         let bm_col = from_str(bm_str)?;
         Ok(bm_col)
     } else {
         Err(format!("Error retrieving bookmarks: {}", attempt_res_text).as_str().into())
+    }
+}
+
+pub fn set_bookmarks(coll: &BookmarkCollection) -> Result<(), Box<dyn Error>> {
+    let cfg = Config::get_global();
+    if !cfg.logged_in {
+        Err("Can't save bookmarks changes! Not logged in.")?
+    }
+
+    let runtime = Runtime::new().unwrap();
+    let fut = set_bookmarks_async(&cfg.email, &cfg.pword, &coll);
+    runtime.block_on(fut)
+}
+
+async fn set_bookmarks_async(
+        email: &str, pword: &str, coll: &BookmarkCollection) -> Result<(), Box<dyn Error>> {
+    let set_attempt_url = format!(
+        "{}/set_bookmarks/{}/{}/{}", BM_SERVER, email, pword, coll.to_string()
+    );
+    let attempt_res_text = get(set_attempt_url).await?.text().await?;
+    if attempt_res_text == "success" {
+        Ok(())
+    } else {
+        Err(format!("Failed to set bookmarks: {}", attempt_res_text).as_str().into())
     }
 }
 
@@ -140,8 +238,8 @@ pub fn request_pword_reset(email: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn request_pword_reset_async(email: &str) -> Result<(), Box<dyn Error>> {
-    let login_attempt_url = format!("{}/req_pass_rst/{}", BM_SERVER, email);
-    let attempt_res_text = get(login_attempt_url).await?.text().await?;
+    let reset_req_attempt_url = format!("{}/req_pass_rst/{}", BM_SERVER, email);
+    let attempt_res_text = get(reset_req_attempt_url).await?.text().await?;
 
     if attempt_res_text == "success" {
         Ok(())
@@ -158,10 +256,10 @@ pub fn reset_password(email: &str, new_password: &str, code: &str) -> Result<(),
 
 async fn reset_password_async(
         email: &str, new_password: &str, code: &str) -> Result<(), Box<dyn Error>> {
-    let login_attempt_url = format!(
+    let reset_password_attempt_url = format!(
         "{}/change_pass/{}/{}/{}", BM_SERVER, email, code, new_password
     );
-    let attempt_res_text = get(login_attempt_url).await?.text().await?;
+    let attempt_res_text = get(reset_password_attempt_url).await?.text().await?;
 
     if attempt_res_text == "success" {
         Ok(())

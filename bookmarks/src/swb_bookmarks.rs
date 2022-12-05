@@ -19,7 +19,7 @@ use cascade::cascade;
 use crate::{
     config::Config,
     sync::{
-        login, register, get_bookmarks,
+        login, register, get_bookmarks, set_bookmarks,
         request_pword_reset, reset_password
     }
 };
@@ -613,13 +613,131 @@ fn create_bm_menu() -> MenuButton {
     };
     popover_content.add(&add_fldr_btn);
 
+    let path_rm_clone = name.clone();
+    let popover_rm_clone = popover.clone();
     let rm_btn = cascade! {
         Button::builder() // Can't use with_label here: crashes w/ gtk::init()
             .label("Remove Item At Path")
             .build();
             ..connect_clicked(move |_btn| {
-                // TODO: Remove bookmark or folder
+                popover_rm_clone.hide();
 
+                // TODO: Remove bookmark or folder
+                let mut bm_col = match get_bookmarks() {
+                    Err(err) => {
+                        println!("Failed to sync bookmarks: {} Continuing local", err);
+                        let cfg = Config::get_global();
+                        cfg.bm_collection
+                    }, Ok(bm_collection) => {
+                        let mut cfg = Config::get_global();
+                        cfg.bm_collection = bm_collection.clone();
+                        Config::set_global(cfg);
+                        Config::store_global();
+
+                        bm_collection
+                    }
+                };
+
+                match bm_col.remove(path_rm_clone.text().as_str()) {
+                    Err(err) => {
+                        let dialog = cascade! {
+                            Dialog::builder()
+                                .title("Error")
+                                .width_request(POPUP_WIDTH)
+                                .height_request(POPUP_HEIGHT)
+                                .build();
+                                ..add_button("Close", ResponseType::Apply);
+                                ..set_modal(false);
+                                ..set_resizable(false);
+                        };
+                        dialog.content_area().pack_start(
+                            &TextView::builder()
+                                .editable(false)
+                                .buffer(
+                                    &TextBuffer::builder()
+                                        .text(&format!("{}", err)).build()
+                                ).hexpand(true).vexpand(true).can_focus(false)
+                                .build(),
+                            true, true, DEF_MARGIN as u32
+                        );
+                        dialog.connect_response(|mini_win, resp| {
+                            if resp == ResponseType::Apply {
+                                mini_win.hide()
+                            }
+                        });
+                        dialog.show_all();
+                    }, Ok(_) => {
+                        let mut cfg = Config::get_global();
+                        cfg.bm_collection = bm_col.clone();
+                        Config::set_global(cfg);
+                        Config::store_global();
+                        match set_bookmarks(&bm_col) {
+                            Err(err) => {
+                                println!("Failed to sync bookmarks: {} Continuing local", err);
+                                let dialog = cascade! {
+                                    Dialog::builder()
+                                        .title("Error")
+                                        .width_request(POPUP_WIDTH)
+                                        .height_request(POPUP_HEIGHT)
+                                        .build();
+                                        ..add_button("Close", ResponseType::Apply);
+                                        ..set_modal(false);
+                                        ..set_resizable(false);
+                                };
+                                dialog.content_area().pack_start(
+                                    &TextView::builder()
+                                        .editable(false)
+                                        .buffer(
+                                            &TextBuffer::builder()
+                                                .text(&format!(
+                                                    "{}\n{}\nError: {}",
+                                                    "Failed to remove from online database.",
+                                                    "Changes will be un-done upon sync!",
+                                                    err
+                                                )).build()
+                                        ).hexpand(true).vexpand(true).can_focus(false)
+                                        .build(),
+                                    true, true, DEF_MARGIN as u32
+                                );
+                                dialog.connect_response(move |mini_win, resp| {
+                                    if resp == ResponseType::Apply {
+                                        mini_win.hide();
+                                    }
+                                });
+                                dialog.show_all();
+                            }, Ok(_) => {}
+                        }
+                        
+                        let dialog = cascade! {
+                            Dialog::builder()
+                                .title("Success")
+                                .width_request(POPUP_WIDTH)
+                                .height_request(POPUP_HEIGHT)
+                                .build();
+                                ..add_button("Close", ResponseType::Apply);
+                                ..set_modal(false);
+                                ..set_resizable(false);
+                        };
+                        dialog.content_area().pack_start(
+                            &TextView::builder()
+                                .editable(false)
+                                .buffer(
+                                    &TextBuffer::builder()
+                                        .text(&String::from(
+                                            "Successfully removed item."
+                                        )).build()
+                                ).hexpand(true).vexpand(true).can_focus(false)
+                                .build(),
+                            true, true, DEF_MARGIN as u32
+                        );
+                        dialog.connect_response(|mini_win, resp| {
+                            if resp == ResponseType::Apply {
+                                mini_win.hide();
+                            }
+                        });
+                        dialog.show_all();
+                    }
+                }
             });
     };
     popover_content.add(&rm_btn);
