@@ -32,6 +32,7 @@ The project is incomplete. Here's what's done:
 - [ ] - bookmark sync
 - [ ] - password sync/autofill
 - [x] - webkit navigation
+- [ ] - mobile version
 
 Currently working on: bookmark sync
 
