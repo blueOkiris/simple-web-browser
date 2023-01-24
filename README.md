@@ -1,5 +1,7 @@
 # SWB (Simple Web Browser)
 
+NOTE: This project is not done!!! Please do not use yet and do not report issues yet. I'll remove this notice when done. You can already do basic navigation with it, if you want, but many core features will not work. Scroll further for progress.
+
 ![Screenshot of Simple Web Browser on i3 (i.e. no menu bar)](./screenshot.png)
 
 ## Description
@@ -9,17 +11,29 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
-1. Built with GTK/Qt to integrate with DEs (using gtk3 and webkit2gtk)
+1. Built with GTK/Qt to integrate with DEs
 2. The following "extra" features I consider necessary (but nothing else):
-   - Adblock (done)
-   - Bookmark sync (currently working on)
-   - Password sync and autofill (not started)
-3. Mobile client (not started)
-4. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit currently)
+   - Adblock
+   - Bookmark sync
+   - Password sync and autofill
+3. Mobile client
+4. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit
 5. No added privacy concerns out of the box (no telemetry, ads, or data collection)
 6. Not built on Chromium/Blink (it's WebKit, so we're good)
 
-Officially supported platforms: Fedora. Will probably make a Flatpak.
+Officially supported platforms: Fedora. Will probably make an AppImage and put on crates.io.
+
+## Roadmap to Initial Release
+
+The project is incomplete. Here's what's done:
+
+- [x] - basic gtk window
+- [x] - adblock
+- [ ] - bookmark sync
+- [ ] - password sync/autofill
+- [x] - webkit navigation
+
+Currently working on: bookmark sync
 
 ## Build
 
