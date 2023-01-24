@@ -1,6 +1,6 @@
 # SWB (Simple Web Browser)
 
-NOTE: This project is not done!!! Please do not use yet and do not report issues yet. I'll remove this notice when done. You can already do basic navigation with it, if you want, but many core features will not work. Scroll further for progress.
+NOTE: This project is __NOT__ done!!! Please do not use yet and do not report issues yet. I'll remove this notice when done. You can already do basic navigation with it, if you want, but many core features will not work. Scroll further for progress.
 
 ![Screenshot of Simple Web Browser on i3 (i.e. no menu bar)](./screenshot.png)
 
