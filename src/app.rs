@@ -33,7 +33,7 @@ const WIN_DEF_WIDTH: i32 = 800;
 const WIN_DEF_HEIGHT: i32 = 600;
 const WIN_TITLE: &'static str = "Simple Web Browser";
 const DEF_MARGIN: i32 = 5;
-const START_PAGE: &'static str = "https://duckduckgo.com/";
+const START_PAGE: &'static str = "https://search.brave.com/";
 
 pub struct App {
     plugins: Vec<Arc<Container<Plugin>>>

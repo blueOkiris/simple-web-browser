@@ -17,15 +17,7 @@ use gtk::Box;
 
 #[derive(WrapperApi)]
 pub struct Plugin {
-    name: extern fn() -> String,
-    on_back_btn_clicked: extern fn(),
-    on_fwd_btn_clicked: extern fn(),
-    on_change_page: extern fn(url: &String),
-    on_refr_btn_clicked: extern fn(),
-    on_navbar_load: extern fn(navbar: &Box),
-    on_window_content_load: extern fn(content: &Box),
-    queue_send_msg: extern fn() -> Option<(String, String)>,
-    recv_msgs: extern fn(msgs: &Vec<(String, String)>)
+    name: extern fn() -> String
 }
 
 pub fn load_plugins() -> Vec<Arc<Container<Plugin>>> {
