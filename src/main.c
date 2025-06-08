@@ -14,6 +14,10 @@
 static void on_activate(GtkApplication *app, gpointer user_data);
 static void spawn_tab(GtkButton *btn, gpointer user_data);
 static void close_tab(GtkButton *btn, gpointer user_data);
+static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data);
+static void on_tab_reordered(
+    GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
+);
 
 static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
 
@@ -51,6 +55,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_margin_start(notebook, PADDING);
     gtk_widget_set_margin_end(notebook, PADDING);
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
+    g_signal_connect(notebook, "page-reordered", G_CALLBACK(on_tab_reordered), NULL);
 
     GtkWidget *outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, SPACING);
     gtk_box_pack_start(GTK_BOX(outer_box), plugin_bar, FALSE, TRUE, PADDING);
@@ -64,9 +69,7 @@ static void spawn_tab(GtkButton *btn, gpointer user_data) {
     GtkWidget *webview = webkit_web_view_new();
     webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webview), "https://search.brave.com/");
 
-    // TODO: Set up call backs for this webview (including references to its tab position)
-
-    GtkWidget *tab_lbl = gtk_label_new("https://search.brave.com/");
+    GtkWidget *tab_lbl = gtk_label_new("New Tab");
     GtkWidget *tab_close_btn = gtk_button_new_with_label("x");
     gtk_button_set_relief(GTK_BUTTON(tab_close_btn), GTK_RELIEF_NONE);
     gtk_widget_set_size_request(tab_close_btn, MICRO_BTN_WIDTH, MICRO_BTN_HEIGHT);
@@ -80,8 +83,14 @@ static void spawn_tab(GtkButton *btn, gpointer user_data) {
     int n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
     int pos = n_pages - 1;
     gtk_notebook_insert_page(GTK_NOTEBOOK(notebook), webview, tab_hbox, pos);
+    gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK(notebook), webview, TRUE);
     gtk_widget_show_all(GTK_WIDGET(notebook));
     gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), pos);
+
+    // TODO: Tell plugins a new tab was created and selected
+    // TODO: Set up call backs for this webview (including references to its tab position)
+
+    g_signal_connect(webview, "notify::title", G_CALLBACK(on_wv_title_changed), tab_lbl);
 }
 
 static void close_tab(GtkButton *btn, gpointer user_data) {
@@ -92,5 +101,24 @@ static void close_tab(GtkButton *btn, gpointer user_data) {
     if (page + 1 == n_pages - 1 && n_pages != 2) {
         n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(NOTEBOOK));
         gtk_notebook_set_current_page(GTK_NOTEBOOK(NOTEBOOK), n_pages - 2);
+    }
+}
+
+static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data) {
+    GtkLabel *lbl = GTK_LABEL(user_data);
+    const char *title = webkit_web_view_get_title(webview);
+    if (title && *title) {
+        gtk_label_set_text(lbl, title);
+    } else {
+        gtk_label_set_text(lbl, "Unknown");
+    }
+}
+
+static void on_tab_reordered(
+        GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data) {
+    int n_pages = gtk_notebook_get_n_pages(notebook);
+    int max_ind = n_pages - 2;
+    if (page_num > max_ind) {
+        gtk_notebook_reorder_child(notebook, child, max_ind);
     }
 }
