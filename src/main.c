@@ -1,5 +1,8 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
+#include <limits.h>
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 #include <plugin.h>
@@ -27,14 +30,55 @@ int main(int argc, char **argv) {
     // Load and start plugins
     char **local_plugin_fnames = NULL;
     size_t n_local_plugins = 0;
-    plugin__find_fnames(local_plugin_fnames, &n_local_plugins, ".");
+    plugin__find_fnames(&local_plugin_fnames, &n_local_plugins, ".");
     char *plugin_folder = plugin__get_plugin_folder();
     char **cfg_plugin_fnames = NULL;
     size_t n_cfg_plugins = 0;
-    plugin__find_fnames(cfg_plugin_fnames, &n_cfg_plugins, plugin_folder);
+    plugin__find_fnames(&cfg_plugin_fnames, &n_cfg_plugins, plugin_folder);
     char **plugin_order = NULL;
     size_t n_plugins = 0;
-    plugin__get_plugin_order(plugin_order, &n_plugins);
+    plugin__get_plugin_order(&plugin_order, &n_plugins);
+    plugin_t *plugins = malloc(sizeof(plugin_t) * n_plugins);
+    size_t loaded = 0;
+    for (size_t i = 0; i < n_plugins; i++) {
+        printf("Loading plugin '%s'\n", plugin_order[i]);
+        bool in_cfg = false;
+        for (size_t j = 0; j < n_cfg_plugins; j++) {
+            if (strcmp(plugin_order[i], cfg_plugin_fnames[j]) == 0) {
+                printf("Plugin %s is in config dir\n", plugin_order[i]);
+                in_cfg = true;
+                break;
+            }
+        }
+        bool in_local = false;
+        if (!in_cfg) {
+            for (size_t j = 0; j < n_local_plugins; j++) {
+                if (strcmp(plugin_order[i], local_plugin_fnames[j]) == 0) {
+                    printf("Plugin %s is in local dir\n", plugin_order[i]);
+                    in_local = true;
+                    break;
+                }
+            }
+        }
+        if (!in_local && !in_cfg) {
+            fprintf(stderr, "Warning! Couldn't find plugin '%s'\n", plugin_order[i]);
+            continue;
+        }
+        char plugin_fname[PATH_MAX] = "";
+        snprintf(
+            plugin_fname, PATH_MAX,
+            "%s/%s", in_local ? "." : plugin_folder, plugin_order[i]
+        );
+        plugin_t plugin = plugin__init(plugin_fname);
+        if (plugin.handle == NULL) {
+            fprintf(stderr, "Warning! Failed to load plugin '%s'\n", plugin_fname);
+            continue;
+        }
+        memcpy(plugins + loaded, &plugin, sizeof(plugin_t));
+        loaded++;
+        plugins[loaded - 1].on_load();
+        printf("Loaded plugin '%s'\n", plugin_fname);
+    }
 
     // Start GUI
     setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1); // Bc it won't work on nvidia otherwise
@@ -44,6 +88,10 @@ int main(int argc, char **argv) {
 
     // Cleanup
     g_object_unref(app);
+    for (size_t i = 0; i < loaded; i++) {
+        plugin__unload(plugins + i);
+    }
+    free(plugins);
     if (plugin_order != NULL) {
         for (size_t i = 0; i < n_plugins; i++) {
             free(plugin_order[i]);

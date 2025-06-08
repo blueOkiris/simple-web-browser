@@ -25,18 +25,18 @@ CFLAGS :=		-g -Wall -Werror -Wno-unused-function \
 				-Iinclude
 endif
 ifndef WINDOWS
-LD :=			ar
+LD :=			gcc
 else
-LD :=			x86_64-w64-mingw32-ar
+LD :=			x86_64-w64-mingw32-gcc
 endif
 ifdef RELEASE
 ifndef WINDOWS
-LDFLAGS :=		rcs
+LDFLAGS :=		-shared
 else
-LDFLAGS :=		rcs
+LDFLAGS :=		-shared
 endif
 else
-LDFLAGS :=		rcs
+LDFLAGS :=		-shared
 endif
 
 ## Project
@@ -90,8 +90,8 @@ $(foreach file,$(SRC),$(eval $(call compile_obj,$(basename $(notdir $(file))))))
 
 ifndef WINDOWS
 lib$(OBJNAME).so: $(OBJS)
-	$(LD) $(LDFLAGS) $@ $(OBJS)
+	$(LD) -o $@ $(LDFLAGS) $(OBJS)
 else
 $(OBJNAME).dll: $(OBJS)
-	$(LD) $(LDFLAGS) $@ $(OBJS)
+	$(LD) -o $@ $(LDFLAGS) $(OBJS)
 endif

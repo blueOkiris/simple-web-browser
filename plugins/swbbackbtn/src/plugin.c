@@ -1,5 +1,7 @@
 // Implement back navigation button
 
-void plugin__on_start(void) {
+#include <stdio.h>
 
+void plugin__on_load(void) {
+    printf("You are inside libswbvackbtn!\n");
 }

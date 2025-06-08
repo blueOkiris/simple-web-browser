@@ -106,12 +106,14 @@ endif
 
 ifndef WINDOWS
 define compile_plugin
+.PHONY: lib$(1).so
 lib$(1).so:
 	make -C plugins/$(1)
 	cp plugins/$(1)/lib$(1).so .
 endef
 else
 define compile_plugin
+.PHONY: $(1).dll
 $(1).dll:
 	make -C plugins\$(1)
 	cp plugins\$(1)\$(1).dll .
