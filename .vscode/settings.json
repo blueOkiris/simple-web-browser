@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "stdio.h": "c",
-        "gtk.h": "c"
+        "gtk.h": "c",
+        "string.h": "c",
+        "dirent.h": "c"
     }
 }

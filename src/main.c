@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <stddef.h>
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
+#include <plugin.h>
 
 #define APP_ID              "com.polymath-studio.SimpleWebBrowser"
 #define WIN_TITLE           "Simple Web Browser"
@@ -22,11 +24,48 @@ static void on_tab_reordered(
 static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
 
 int main(int argc, char **argv) {
+    // Load and start plugins
+    char **local_plugin_fnames = NULL;
+    size_t n_local_plugins = 0;
+    plugin__find_fnames(local_plugin_fnames, &n_local_plugins, ".");
+    char *plugin_folder = plugin__get_plugin_folder();
+    char **cfg_plugin_fnames = NULL;
+    size_t n_cfg_plugins = 0;
+    plugin__find_fnames(cfg_plugin_fnames, &n_cfg_plugins, plugin_folder);
+    char **plugin_order = NULL;
+    size_t n_plugins = 0;
+    plugin__get_plugin_order(plugin_order, &n_plugins);
+
+    // Start GUI
     setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1); // Bc it won't work on nvidia otherwise
     GtkApplication *app = gtk_application_new(APP_ID, G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect(app, "activate", G_CALLBACK(on_activate), NULL);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
+
+    // Cleanup
     g_object_unref(app);
+    if (plugin_order != NULL) {
+        for (size_t i = 0; i < n_plugins; i++) {
+            free(plugin_order[i]);
+        }
+        free(plugin_order);
+        plugin_order = NULL;
+    }
+    if (cfg_plugin_fnames != NULL) {
+        for (size_t i = 0; i < n_cfg_plugins; i++) {
+            free(cfg_plugin_fnames[i]);
+        }
+        free(cfg_plugin_fnames);
+        cfg_plugin_fnames = NULL;
+    }
+    free(plugin_folder);
+    if (local_plugin_fnames != NULL) {
+        for (size_t i = 0; i < n_local_plugins; i++) {
+            free(local_plugin_fnames[i]);
+        }
+        free(local_plugin_fnames);
+        local_plugin_fnames = NULL;
+    }
     return status;
 }
 
@@ -65,6 +104,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_show_all(win);
 }
 
+// When the + tab is clicked, create a new page and put it at the end.
 static void spawn_tab(GtkButton *btn, gpointer user_data) {
     GtkWidget *webview = webkit_web_view_new();
     webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webview), "https://search.brave.com/");
@@ -93,6 +133,7 @@ static void spawn_tab(GtkButton *btn, gpointer user_data) {
     g_signal_connect(webview, "notify::title", G_CALLBACK(on_wv_title_changed), tab_lbl);
 }
 
+// When the x of a tab is clicked, remove it
 static void close_tab(GtkButton *btn, gpointer user_data) {
     int page = gtk_notebook_page_num(GTK_NOTEBOOK(NOTEBOOK), GTK_WIDGET(user_data));
     int n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(NOTEBOOK));
@@ -104,16 +145,18 @@ static void close_tab(GtkButton *btn, gpointer user_data) {
     }
 }
 
+// When the webpage loads its title, update the label
 static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data) {
     GtkLabel *lbl = GTK_LABEL(user_data);
     const char *title = webkit_web_view_get_title(webview);
     if (title && *title) {
         gtk_label_set_text(lbl, title);
     } else {
-        gtk_label_set_text(lbl, "Unknown");
+        gtk_label_set_text(lbl, "Web Page Title");
     }
 }
 
+// Don't let the user move a tab past the plus button
 static void on_tab_reordered(
         GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data) {
     int n_pages = gtk_notebook_get_n_pages(notebook);
