@@ -1,6 +1,6 @@
-*.lock
-target/
-*.log
-
-ContentRuleList*
-
+# C
+*.o
+*.so
+obj/
+*.dll
+swb

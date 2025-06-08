@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Simple Web Browser
-Icon=swb-icon
-Exec=/usr/bin/swb
-Terminal=false
