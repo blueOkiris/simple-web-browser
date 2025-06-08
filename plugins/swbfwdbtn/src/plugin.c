@@ -1,4 +1,4 @@
-// Implement back navigation button
+// Implement forward navigation button
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -6,19 +6,19 @@
 #include <webkit2/webkit2.h>
 
 static void on_click(GtkButton *btn, gpointer user_data);
-static void go_back(void);
+static void go_fwd(void);
 
 static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 
 // When the plugin first gets loaded in
 void plugin__on_load(void) {
-    printf("[Swb Back Btn] I loaded successfully.\n");
+    printf("[Swb Fwd Btn] I loaded successfully.\n");
 }
 
 // What to put in the navigation bar
 GtkWidget *plugin__create_bar_item(GtkNotebook *notebook) {
     NOTEBOOK = notebook;
-    GtkWidget *btn = gtk_button_new_with_label("←");
+    GtkWidget *btn = gtk_button_new_with_label("→");
     g_signal_connect(btn, "clicked", G_CALLBACK(on_click), NULL);
     return btn;
 }
@@ -38,27 +38,27 @@ bool plugin__is_pack_fill(void) {
     return false;
 }
 
-// When a key is pressed. In this case, if Alt+Left is pressed, go back
+// When a key is pressed. In this case, if Alt+Right is pressed, go forward
 void plugin__on_key_press(GdkEventKey *event) {
-    if ((event->state & GDK_MOD1_MASK) && event->keyval == GDK_KEY_Left) {
-        go_back();
+    if ((event->state & GDK_MOD1_MASK) && event->keyval == GDK_KEY_Right) {
+        go_fwd();
     }
 }
 
-// When a btn is pressed. In this case, if mouse back, go back
+// When a btn is pressed. In this case, if mouse fwd, go fwd
 void plugin__on_btn_press(GdkEventButton *event) {
-    if (event->type == GDK_BUTTON_PRESS && event->button == 8) {
-        go_back();
+    if (event->type == GDK_BUTTON_PRESS && event->button == 9) {
+        go_fwd();
     }
 }
 
 // What to do when our button is clicked
 static void on_click(GtkButton *btn, gpointer user_data) {
-    go_back();
+    go_fwd();
 }
 
-// Make the current webview go back
-static void go_back(void) {
+// Make the current webview go forward
+static void go_fwd(void) {
     // Get the current tab webview
     GtkWidget *current_page = gtk_notebook_get_nth_page(
         NOTEBOOK, gtk_notebook_get_current_page(NOTEBOOK)
@@ -69,5 +69,5 @@ static void go_back(void) {
     }
 
     // Navigate back
-    webkit_web_view_go_back(WEBKIT_WEB_VIEW(current_page));
+    webkit_web_view_go_forward(WEBKIT_WEB_VIEW(current_page));
 }

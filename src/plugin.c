@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <errno.h>
 #endif
+#include <gtk/gtk.h>
+#include <webkit2/webkit2.h>
 #include <plugin.h>
 
 static bool append_fnames(const char *const search_fldr, char ***dest, size_t *len);
@@ -153,6 +155,88 @@ plugin_t plugin__init(char *fname) {
         return plugin;
     }
     plugin.on_load = on_load;
+
+    fn_create_bar_item create_bar_item =
+        (fn_create_bar_item) dlsym(plugin.handle, "plugin__create_bar_item");
+    if (!create_bar_item) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__create_bar_item': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.create_bar_item = create_bar_item;
+
+    fn_is_pack_start is_pack_start =
+        (fn_is_pack_start) dlsym(plugin.handle, "plugin__is_pack_start");
+    if (!is_pack_start) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__is_pack_start': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.is_pack_start = is_pack_start;
+
+    fn_is_pack_expand is_pack_expand =
+        (fn_is_pack_expand) dlsym(plugin.handle, "plugin__is_pack_expand");
+    if (!is_pack_expand) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__is_pack_expand': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.is_pack_expand = is_pack_expand;
+
+    fn_is_pack_fill is_pack_fill = (fn_is_pack_fill) dlsym(plugin.handle, "plugin__is_pack_fill");
+    if (!is_pack_fill) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__is_pack_fill': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.is_pack_fill = is_pack_fill;
+
+    fn_on_key_press on_key_press = (fn_on_key_press) dlsym(plugin.handle, "plugin__on_key_press");
+    if (!on_key_press) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_key_press': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_key_press = on_key_press;
+
+    fn_on_btn_press on_btn_press = (fn_on_btn_press) dlsym(plugin.handle, "plugin__on_btn_press");
+    if (!on_btn_press) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_btn_press': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_btn_press = on_btn_press;
+
     return plugin;
 }
 
