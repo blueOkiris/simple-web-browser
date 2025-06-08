@@ -7,7 +7,7 @@
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 
-typedef void (*fn_on_load)(void);
+typedef int (*fn_on_load)(void);
 typedef GtkWidget *(*fn_create_bar_item)(GtkNotebook *notebook);
 typedef bool (*fn_is_pack_start)(void);
 typedef bool (*fn_is_pack_expand)(void);

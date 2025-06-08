@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
+#include <version.h>
 #include <plugin.h>
 
 #define APP_ID              "com.polymath-studio.SimpleWebBrowser"
@@ -32,6 +33,8 @@ static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic fun
 static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
 
 int main(int argc, char **argv) {
+    printf("%s v%u.%u by Dylan Turner\n", WIN_TITLE, MAJOR_VERS, MINOR_VERS);
+
     // Load dynamic libraries into the PLUGINS array
     load_plugins();
 
@@ -56,17 +59,27 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     GtkWidget *win = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(win), WIN_TITLE);
     gtk_window_set_default_size(GTK_WINDOW(win), WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
+    GtkWidget *notebook = gtk_notebook_new();
+    NOTEBOOK = notebook;
 
     // TODO: UI
 
-    // The tab system
-    GtkWidget *notebook = gtk_notebook_new();
-    NOTEBOOK = notebook;
+    // New tab page
     GtkWidget *new_tab_btn = gtk_button_new_with_label("+");
     gtk_button_set_relief(GTK_BUTTON(new_tab_btn), GTK_RELIEF_NONE);
     gtk_widget_set_size_request(new_tab_btn, MICRO_BTN_WIDTH, MICRO_BTN_HEIGHT);
     g_signal_connect(new_tab_btn, "clicked", G_CALLBACK(spawn_tab), notebook);
-    GtkWidget *new_tab_btn_content = gtk_label_new("");
+    char lbl[1000] = "";
+    snprintf(lbl, 1000, "Version: v%u.%u", MAJOR_VERS, MINOR_VERS);
+    GtkWidget *lbl_app_name = gtk_label_new(WIN_TITLE);
+    GtkWidget *lbl_created = gtk_label_new("by Dylan Turner");
+    GtkWidget *lbl_vers = gtk_label_new(lbl);
+    GtkWidget *new_tab_btn_content = gtk_box_new(GTK_ORIENTATION_VERTICAL, SPACING);
+    gtk_box_pack_start(GTK_BOX(new_tab_btn_content), lbl_app_name, false, false, PADDING);
+    gtk_box_pack_start(GTK_BOX(new_tab_btn_content), lbl_created, false, false, PADDING);
+    gtk_box_pack_start(GTK_BOX(new_tab_btn_content), lbl_vers, false, false, PADDING);
+
+    // The tab system
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), new_tab_btn_content, new_tab_btn);
     gtk_widget_set_margin_top(notebook, 0);
     gtk_widget_set_margin_bottom(notebook, PADDING);
@@ -235,9 +248,15 @@ static void load_plugins(void) {
             fprintf(stderr, "Warning! Failed to load plugin '%s'\n", plugin_fname);
             continue;
         }
+        int major_vers = plugin.on_load();
+        if (major_vers != MAJOR_VERS) {
+            fprintf(
+                stderr, "Warning! Cannot load plugin '%s'. Made for different version.\n", plugin_fname
+            );
+            continue;
+        }
         memcpy(PLUGINS + N_PLUGINS_LOADED, &plugin, sizeof(plugin_t));
         N_PLUGINS_LOADED++;
-        PLUGINS[N_PLUGINS_LOADED - 1].on_load();
         printf("Loaded plugin '%s'\n", plugin_fname);
     }
     if (plugin_order != NULL) {

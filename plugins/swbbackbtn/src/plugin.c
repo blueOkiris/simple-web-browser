@@ -5,14 +5,17 @@
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 
+#define MAJOR_VERS      1
+
 static void on_click(GtkButton *btn, gpointer user_data);
 static void go_back(void);
 
 static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 
-// When the plugin first gets loaded in
-void plugin__on_load(void) {
+// When the plugin first gets loaded in. Return Major version supported
+int plugin__on_load(void) {
     printf("[Swb Back Btn] I loaded successfully.\n");
+    return MAJOR_VERS;
 }
 
 // What to put in the navigation bar
