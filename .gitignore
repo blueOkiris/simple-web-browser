@@ -1,6 +1,12 @@
-*.lock
-target/
-*.log
+# C
+*.o
+*.so
+obj/
+*.dll
+swb
 
-ContentRuleList*
-
+# MXE
+*.zip
+mxe-*/
+*.tar.xz
+webkitgtk-*/

@@ -1,5 +1,0 @@
-# Remove this line and place this file in /etc/swb-db/swb-db-accounts.txt
-<mongo db user with access to database>
-<password for user>
-<application password for email used to send reset codes in db.rs>
-

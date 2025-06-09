@@ -1,8 +1,19 @@
 # SWB (Simple Web Browser)
 
-NOTE: This project is __NOT__ done!!! Please do not use yet and do not report issues yet. I'll remove this notice when done. You can already do basic navigation with it, if you want, but many core features will not work. Scroll further for progress.
+NOTE: THIS PROJECT IS NOT COMPLETE!!!!
 
-![Screenshot of Simple Web Browser on i3 (i.e. no menu bar)](./screenshot.png)
+Feature progress:
+
+- [x] Tabs
+- [x] Plugin Loading
+- [x] Navigation and rendering
+- [x] Adblock
+- [ ] Downloads
+- [ ] Bookmark Storage
+- [ ] Password Storage
+- [ ] Navigation + Tabs (Link Following)
+
+![screenshot](./img/screenshot-2025_06_09.png)
 
 ## Description
 
@@ -11,78 +22,40 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
-1. Built with GTK/Qt to integrate with DEs
-2. The following "extra" features I consider necessary (but nothing else):
+
+1. Only the folowing features implemented (what I consider necessary):
+   - Modern rendering of pages (Doesn't have to be perfect, but must be usable)
+   - Navigation: Search, Direct Link, Forwards, Backwards
+   - Tabs
+   - Downloads
    - Adblock
-   - Bookmark sync
-   - Password sync and autofill
-3. Mobile client
-4. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit
+   - Bookmarks: Creation, Deletion, Folder Sorting
+   - Password Storage
+2. Plugin system that can greatly modify the browser (including UI), acheived by making *everything* a plugin, even things like the back and forward buttons.
+3. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit in this case)
+4. Well, *except*, not built on Chromium/Blink, since that has a monopoly
 5. No added privacy concerns out of the box (no telemetry, ads, or data collection)
-6. Not built on Chromium/Blink (it's WebKit, so we're good)
 
-Officially supported platforms: Fedora. Will probably make an AppImage and put on crates.io.
-
-## Roadmap to Initial Release
-
-The project is incomplete. Here's what's done:
-
-- [x] - basic gtk window
-- [x] - adblock
-- [ ] - bookmark sync
-- [ ] - password sync/autofill
-- [x] - webkit navigation
-- [ ] - mobile version
-
-Currently working on: bookmark sync
+Officially supported platform will be Arch Linux, but binaries will be built for other Linux, and package maintainers are welcome to build their own.
 
 ## Build
 
-Obviously, all this will be handled by the package, but if you're building from source, this is what you've gotta do.
+Dependencies:
 
-First, install Dependencies:
-- cargo
-- webkit2gtk libs
-- gtk3 libs
-- pkgconf
-- Linux
+- curl
+- \*nix (Arch is the supported platform)
+- gcc
+- gtk3
+- make
+- pkg-config
+- webkit2gtk
 
-To simply try it out, from the repo folder, run `cargo run`
-
-If you want to install it somewhere:
-- Build with `cargo build --release`
-- Copy the binary "swb" from target/release to /usr/bin/
-- Create the folder `~/.config/swb`
-- Create a plugins/ folder in the install location, `~/.config/swb`, and copy into it the libswb_bookmarks.so and libswb_webkit.so files from target/release/
-- Copy swb.desktop to /usr/share/applications and copy swb-icon.png /usr/share/pixmap
-
-Again, once the package is made, it will do all that jazz for you
+`make RELEASE=1`
 
 ## Architecture
 
-The browser itself is built around plugins.
+Outside of some core framework glue, everything in swb is designed to be a plugin.
 
-Want to use Firefox sync for bookmarks instead of my system? Go ahead and make a plugin for that
+Plugins can respond to a variety of events that happen like "when a page loads."
 
-Want a different adblock? Go for it
-
-Want to switch to a completely different browser engine? Be my guest!
-
-The default system will use:
-- An adblocker built on easylist
-- Bookmark sync to my personal server
-- Password sync on my personal server
-- WebKit Gtk
-
-The actual main window contains:
-- a container for the web page rendering
-- back and forward buttons
-- a search bar
-- a refresh button
-- a bookmarks menu including a folders system
-- a sync menu for logging in/logging out
-- a button for updating the adblocker filter rules.
-
-Events from the main window like searching or creating a bookmark call plugins to do the dirty work. To see what the plugin supports, look in `core/src/plugin.rs`
-
-The mobile app has yet to be thought about. Might try to compile for WebAsm, create a webview wrapper for android, and get it to run in that, or I might try to actually make a new interface. Has not been decided yet.
+However, plugins can also choose to have a widget, most often a button, in the bar

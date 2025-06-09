@@ -1,4 +1,0 @@
-[workspace]
-members = [ "core", "webkit", "bookmarks", "db" ]
-default-members = [ "core", "webkit", "bookmarks" ]
-
