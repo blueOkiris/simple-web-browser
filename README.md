@@ -15,26 +15,25 @@ Goals:
    - Adblock
    - Bookmarks: Creation, Deletion, Folder Sorting
    - Password Storage
-   - Extensions that can greatly modify the browser (including UI)
-2. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit in this case)
-3. Well, *except*, not built on Chromium/Blink, since that has a monopoly
-4. No added privacy concerns out of the box (no telemetry, ads, or data collection)
+2. Plugin system that can greatly modify the browser (including UI), acheived by making *everything* a plugin, even things like the back and forward buttons.
+3. Decent performance, i.e. built on top 3 engines: Blink, Gecko, or WebKit (WebKit in this case)
+4. Well, *except*, not built on Chromium/Blink, since that has a monopoly
+5. No added privacy concerns out of the box (no telemetry, ads, or data collection)
 
-Officially supported platform will be Arch Linux
+Officially supported platform will be Arch Linux, but binaries will be built for other Linux, and package maintainers are welcome to build their own.
 
 ## Build
 
 Dependencies:
 
+- \*nix (Arch is the supported platform)
 - gcc
 - gtk3
-- make (on Windows, via mingw64)
+- make
 - pkg-config
 - webkit2gtk
 
-\*nix: `make RELEASE=1`
-
-Windows: `mingw32-make RELEASE=1 WINDOWS=1`
+`make RELEASE=1`
 
 ## Architecture
 

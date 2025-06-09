@@ -1,40 +1,29 @@
 # Project settings
 
+## Windows Cross-Compilation
+
+MXE_COMMIT :=	f485e7f11d3383c5891d3ec73c56360fcf3aa124
+MXE_ZIP :=		$(MXE_COMMIT).zip
+MXE_FLDR :=		mxe-$(MXE_COMMIT)
+MXE_TARGET :=	x86_64-w64-mingw32.static
+
 ## Compiler
-ifndef WINDOWS
+
 CC :=			gcc
-else
-CC :=			x86_64-w64-mingw32-gcc
-endif
 ifdef RELEASE
-ifndef WINDOWS
 CFLAGS :=		-O2 -Wall -Werror -Wno-unused-function \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
 				-Iinclude
-else
-CFLAGS :=		-O2 -Wall -Werror -Wno-unused-function -mwindows \
-				-DWIN32 $(shell pkg-config --cflags gtk+-3.0) \
-				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
-				-Iinclude
-endif
 else
 CFLAGS :=		-g -Wall -Werror -Wno-unused-function \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
 				-Iinclude
 endif
-ifndef WINDOWS
 LD :=			gcc
-else
-LD :=			x86_64-w64-mingw32-gcc
-endif
 ifdef RELEASE
-ifndef WINDOWS
 LDFLAGS :=		-shared
-else
-LDFLAGS :=		-shared
-endif
 else
 LDFLAGS :=		-shared
 endif
@@ -50,13 +39,8 @@ OBJS =			$(SRC:src/%.c=obj/%.o)
 ## Helpers
 
 ifdef RELEASE
-ifndef WINDOWS
 .PHONY: all
 all: clean lib$(OBJNAME).so
-else
-.PHONY: all
-all: clean lib$(OBJNAME).dll
-endif
 else
 .PHONY: all
 all: lib$(OBJNAME).so
@@ -68,19 +52,11 @@ clean:
 	-rm -rf *.so
 	-rm -rf *.dll
 
-ifndef WINDOWS
 define compile_obj
 obj/$(1).o: src/$(1).c $(shell grep -o '#include *[<"][^>"]*\.h[">]' src/$(1).c | sed -E 's/#include *[<"]([^">]+)[">]/\1/' | while read header; do if [ -f include/$header ]; then echo $header; fi; done)
 	mkdir -p obj/
 	$(CC) -o obj/$(1).o $(CFLAGS) -c src/$(1).c
 endef
-else
-define compile_obj
-obj/$(1).o: src\$(1).c $(wildcard include/*)
-	-mkdir obj
-	$(CC) -o obj\$(1).o $(CFLAGS) -c src\$(1).c
-endef
-endif
 
 -include $(OBJS:.o=.d)
 
@@ -88,10 +64,5 @@ endif
 
 $(foreach file,$(SRC),$(eval $(call compile_obj,$(basename $(notdir $(file))))))
 
-ifndef WINDOWS
 lib$(OBJNAME).so: $(OBJS)
 	$(LD) -o $@ $(LDFLAGS) $(OBJS)
-else
-$(OBJNAME).dll: $(OBJS)
-	$(LD) -o $@ $(LDFLAGS) $(OBJS)
-endif

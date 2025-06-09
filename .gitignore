@@ -4,3 +4,9 @@
 obj/
 *.dll
 swb
+
+# MXE
+*.zip
+mxe-*/
+*.tar.xz
+webkitgtk-*/
