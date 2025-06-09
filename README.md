@@ -22,6 +22,7 @@ Pronounced as "swub" /swʌb/
 A Web Browser should be a Web Browser and nothing more, and it should integrate well with your system.
 
 Goals:
+
 1. Only the folowing features implemented (what I consider necessary):
    - Modern rendering of pages (Doesn't have to be perfect, but must be usable)
    - Navigation: Search, Direct Link, Forwards, Backwards
