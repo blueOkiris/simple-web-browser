@@ -1,5 +1,20 @@
 # SWB (Simple Web Browser)
 
+NOTE: THIS PROJECT IS NOT COMPLETE!!!!
+
+Feature progress:
+
+- [x] Tabs
+- [x] Plugin Loading
+- [x] Navigation and rendering
+- [x] Adblock
+- [ ] Downloads
+- [ ] Bookmark Storage
+- [ ] Password Storage
+- [ ] Navigation + Tabs (Link Following)
+
+![screenshot](./img/screenshot-2025_06_09.png)
+
 ## Description
 
 Pronounced as "swub" /swʌb/
