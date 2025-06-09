@@ -1,4 +1,4 @@
-// Implement forward navigation button
+// Implement a button to refresh a page
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,25 +10,25 @@
 static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 
 static void on_click(GtkButton *btn, gpointer user_data);
-static void go_fwd(void);
+static void refresh(bool use_cache);
 
-// When the plugin first gets loaded in
+// When the plugin first gets loaded in. Return Major version supported
 int plugin__on_load(void) {
-    printf("[Swb Fwd Btn] I loaded successfully.\n");
+    printf("[Swb Refresh Btn] I loaded successfully.\n");
     return MAJOR_VERS;
 }
 
 // What to put in the navigation bar
 GtkWidget *plugin__create_bar_item(GtkNotebook *notebook) {
     NOTEBOOK = notebook;
-    GtkWidget *btn = gtk_button_new_with_label("→");
+    GtkWidget *btn = gtk_button_new_with_label("↻");
     g_signal_connect(btn, "clicked", G_CALLBACK(on_click), NULL);
     return btn;
 }
 
 // Whether to grow from the start or end of the plugin bar
 bool plugin__is_pack_start(void) {
-    return true;
+    return false;
 }
 
 // Should the box get extra available space
@@ -41,30 +41,28 @@ bool plugin__is_pack_fill(void) {
     return false;
 }
 
-// When a key is pressed. In this case, if Alt+Right is pressed, go forward
+// When a key is pressed. In this case, if Ctrl+R is pressed, refresh
 void plugin__on_key_press(GdkEventKey *event) {
-    if ((event->state & GDK_MOD1_MASK) && event->keyval == GDK_KEY_Right) {
-        go_fwd();
+    if ((event->state & GDK_CONTROL_MASK) && event->keyval == GDK_KEY_r) {
+        refresh(true);
+    } else if ((event->state & GDK_CONTROL_MASK) && event->keyval == GDK_KEY_R) {
+        refresh(false);
     }
 }
 
-// When a btn is pressed. In this case, if mouse fwd, go fwd
-void plugin__on_btn_press(GdkEventButton *event) {
-    if (event->type == GDK_BUTTON_PRESS && event->button == 9) {
-        go_fwd();
-    }
-}
-
-// What to do when our button is clicked
-static void on_click(GtkButton *btn, gpointer user_data) {
-    go_fwd();
-}
+// When a btn is pressed
+void plugin__on_btn_press(GdkEventButton *event) {}
 
 // When the webview changes pages
 void plugin__on_page_change(void) {}
 
-// Make the current webview go forward
-static void go_fwd(void) {
+// What to do when our button is clicked
+static void on_click(GtkButton *btn, gpointer user_data) {
+    refresh(true);
+}
+
+// Make the current webview refresh
+static void refresh(bool use_cache) {
     // Get the current tab webview
     GtkWidget *current_page = gtk_notebook_get_nth_page(
         NOTEBOOK, gtk_notebook_get_current_page(NOTEBOOK)
@@ -75,5 +73,9 @@ static void go_fwd(void) {
     }
 
     // Navigate back
-    webkit_web_view_go_forward(WEBKIT_WEB_VIEW(current_page));
+    if (use_cache) {
+        webkit_web_view_reload(WEBKIT_WEB_VIEW(current_page));
+    } else {
+        webkit_web_view_reload_bypass_cache(WEBKIT_WEB_VIEW(current_page));
+    }
 }

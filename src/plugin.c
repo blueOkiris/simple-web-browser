@@ -237,6 +237,20 @@ plugin_t plugin__init(char *fname) {
     }
     plugin.on_btn_press = on_btn_press;
 
+    fn_on_page_change on_page_change =
+        (fn_on_page_change) dlsym(plugin.handle, "plugin__on_page_change");
+    if (!on_page_change) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_page_change': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_page_change = on_page_change;
+
     return plugin;
 }
 

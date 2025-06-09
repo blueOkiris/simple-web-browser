@@ -7,10 +7,10 @@
 
 #define MAJOR_VERS      1
 
+static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
+
 static void on_click(GtkButton *btn, gpointer user_data);
 static void go_back(void);
-
-static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 
 // When the plugin first gets loaded in. Return Major version supported
 int plugin__on_load(void) {
@@ -54,6 +54,9 @@ void plugin__on_btn_press(GdkEventButton *event) {
         go_back();
     }
 }
+
+// When the webview changes pages
+void plugin__on_page_change(void) {}
 
 // What to do when our button is clicked
 static void on_click(GtkButton *btn, gpointer user_data) {

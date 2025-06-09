@@ -6,6 +6,7 @@
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 #include <version.h>
+#include <notebook.h>
 #include <plugin.h>
 
 #define APP_ID              "com.polymath-studio.SimpleWebBrowser"
@@ -17,20 +18,21 @@
 #define MICRO_BTN_WIDTH     16
 #define MICRO_BTN_HEIGHT    16
 
+static size_t N_PLUGINS_LOADED = 0;
+static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic functions called throughout
+static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
+
 static void on_activate(GtkApplication *app, gpointer user_data);
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data);
 static gboolean on_btn_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
 static void spawn_tab(GtkButton *btn, gpointer user_data);
 static void close_tab(GtkButton *btn, gpointer user_data);
 static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data);
+static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data);
 static void on_tab_reordered(
     GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
 );
 static void load_plugins(void);
-
-static size_t N_PLUGINS_LOADED = 0;
-static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic functions called throughout
-static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
 
 int main(int argc, char **argv) {
     printf("%s v%u.%u by Dylan Turner\n", WIN_TITLE, MAJOR_VERS, MINOR_VERS);
@@ -52,6 +54,35 @@ int main(int argc, char **argv) {
     }
     free(PLUGINS);
     return status;
+}
+
+void notebook__spawn_tab(GtkNotebook *notebook, const char *const url) {
+    GtkWidget *webview = webkit_web_view_new();
+    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webview), url ? url : "https://search.brave.com/");
+
+    GtkWidget *tab_lbl = gtk_label_new("New Tab");
+    GtkWidget *tab_close_btn = gtk_button_new_with_label("x");
+    gtk_button_set_relief(GTK_BUTTON(tab_close_btn), GTK_RELIEF_NONE);
+    gtk_widget_set_size_request(tab_close_btn, MICRO_BTN_WIDTH, MICRO_BTN_HEIGHT);
+    g_signal_connect(tab_close_btn, "clicked", G_CALLBACK(close_tab), webview);
+    GtkWidget *tab_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, SPACING);
+    gtk_box_pack_start(GTK_BOX(tab_hbox), tab_lbl, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(tab_hbox), tab_close_btn, FALSE, FALSE, 0);
+    gtk_widget_show_all(tab_hbox);
+
+    int n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
+    int pos = n_pages - 1;
+    gtk_notebook_insert_page(GTK_NOTEBOOK(notebook), webview, tab_hbox, pos);
+    gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK(notebook), webview, TRUE);
+    gtk_widget_show_all(GTK_WIDGET(notebook));
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), pos);
+
+    // TODO: Tell plugins a new tab was created and selected
+    // TODO: Set up call backs for this webview (including references to its tab position)
+    g_signal_connect(webview, "notify::title", G_CALLBACK(on_wv_title_changed), tab_lbl);
+    gtk_widget_add_events(webview, GDK_BUTTON_PRESS_MASK);
+    g_signal_connect(webview, "button-press-event", G_CALLBACK(on_btn_press), NULL);
+    g_signal_connect(webview, "notify::uri", G_CALLBACK(on_wv_uri_changed), NULL);
 }
 
 // Build the UI in the window
@@ -121,7 +152,7 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
 }
 
 // Handle keyboard shortcuts
-gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
+static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data) {
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         PLUGINS[i].on_key_press(event);
     }
@@ -129,7 +160,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 }
 
 // Handle button presses (like mouse buttons)
-gboolean on_btn_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
+static gboolean on_btn_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         PLUGINS[i].on_btn_press(event);
     }
@@ -138,33 +169,10 @@ gboolean on_btn_press(GtkWidget *widget, GdkEventButton *event, gpointer user_da
 
 // When the + tab is clicked, create a new page and put it at the end.
 static void spawn_tab(GtkButton *btn, gpointer user_data) {
-    GtkWidget *webview = webkit_web_view_new();
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webview), "https://search.brave.com/");
-
-    GtkWidget *tab_lbl = gtk_label_new("New Tab");
-    GtkWidget *tab_close_btn = gtk_button_new_with_label("x");
-    gtk_button_set_relief(GTK_BUTTON(tab_close_btn), GTK_RELIEF_NONE);
-    gtk_widget_set_size_request(tab_close_btn, MICRO_BTN_WIDTH, MICRO_BTN_HEIGHT);
-    g_signal_connect(tab_close_btn, "clicked", G_CALLBACK(close_tab), webview);
-    GtkWidget *tab_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, SPACING);
-    gtk_box_pack_start(GTK_BOX(tab_hbox), tab_lbl, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(tab_hbox), tab_close_btn, FALSE, FALSE, 0);
-    gtk_widget_show_all(tab_hbox);
-
-    GtkNotebook *notebook = GTK_NOTEBOOK(user_data);
-    int n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));
-    int pos = n_pages - 1;
-    gtk_notebook_insert_page(GTK_NOTEBOOK(notebook), webview, tab_hbox, pos);
-    gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK(notebook), webview, TRUE);
-    gtk_widget_show_all(GTK_WIDGET(notebook));
-    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), pos);
-
-    // TODO: Tell plugins a new tab was created and selected
-    // TODO: Set up call backs for this webview (including references to its tab position)
-
-    g_signal_connect(webview, "notify::title", G_CALLBACK(on_wv_title_changed), tab_lbl);
-    gtk_widget_add_events(webview, GDK_BUTTON_PRESS_MASK);
-    g_signal_connect(webview, "button-press-event", G_CALLBACK(on_btn_press), NULL);
+    notebook__spawn_tab(GTK_NOTEBOOK(user_data), NULL);
+    for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
+        PLUGINS[i].on_page_change();
+    }
 }
 
 // When the x of a tab is clicked, remove it
@@ -187,6 +195,13 @@ static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpoin
         gtk_label_set_text(lbl, title);
     } else {
         gtk_label_set_text(lbl, "Web Page Title");
+    }
+}
+
+// When a webpage is loaded, we tell the plugins
+static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data) {
+    for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
+        PLUGINS[i].on_page_change();
     }
 }
 

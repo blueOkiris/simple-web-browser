@@ -1,2 +1,4 @@
 libswbbackbtn.so
 libswbfwdbtn.so
+libswbnavbar.so
+libswbrefreshbtn.so

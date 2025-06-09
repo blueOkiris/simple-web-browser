@@ -14,6 +14,7 @@ typedef bool (*fn_is_pack_expand)(void);
 typedef bool (*fn_is_pack_fill)(void);
 typedef void (*fn_on_key_press)(GdkEventKey *event);
 typedef void (*fn_on_btn_press)(GdkEventButton *event);
+typedef void (*fn_on_page_change)(void);
 
 // Storage of the different functions a plugin will have
 typedef struct {
@@ -25,6 +26,7 @@ typedef struct {
     fn_is_pack_fill is_pack_fill;
     fn_on_key_press on_key_press;
     fn_on_btn_press on_btn_press;
+    fn_on_page_change on_page_change;
 } plugin_t;
 
 // Find ~/.config/swb/plugins/ (or equivalent)
