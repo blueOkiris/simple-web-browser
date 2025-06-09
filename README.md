@@ -12,6 +12,7 @@ Feature progress:
 - [ ] Bookmark Storage
 - [ ] Password Storage
 - [ ] Navigation + Tabs (Link Following)
+- [ ] PKGBUILD
 
 ![screenshot](./img/screenshot-2025_06_09.png)
 
