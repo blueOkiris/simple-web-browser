@@ -19,6 +19,9 @@ int plugin__on_load(void) {
     return MAJOR_VERS;
 }
 
+// When plugin is deinitialized
+void plugin__on_unload(void) {}
+
 // What to put in the navigation bar
 GtkWidget *plugin__create_bar_item(GtkNotebook *notebook) {
     NOTEBOOK = notebook;
@@ -65,8 +68,25 @@ void plugin__on_page_change(void) {
     gtk_widget_show_all(GTK_WIDGET(ENTRY));
 }
 
+// When a new tab is created
+void plugin__on_new_tab(WebKitWebView *webview) {}
+
+// When a tab is clicked on
+void plugin__on_tab_switched(guint page) {
+    // Get the current page uri
+    GtkWidget *page_content = gtk_notebook_get_nth_page(NOTEBOOK, page);
+    if (!WEBKIT_IS_WEB_VIEW(page_content)) {
+        return;
+    }
+    const gchar *uri = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(page_content));
+
+    // Update text
+    gtk_entry_set_text(ENTRY, uri);
+    gtk_widget_show_all(GTK_WIDGET(ENTRY));
+}
+
 // Figure out if the text is a url or not and format it if so
-void format_url(char *buff, size_t buff_max, const char *const text) {
+static void format_url(char *buff, size_t buff_max, const char *const text) {
     if (strchr(text, '.')) {
         // Treat as a url
         if (strncmp(text, "https://", 8) != 0) {

@@ -8,6 +8,7 @@
 #include <webkit2/webkit2.h>
 
 typedef int (*fn_on_load)(void);
+typedef void (*fn_on_unload)(void);
 typedef GtkWidget *(*fn_create_bar_item)(GtkNotebook *notebook);
 typedef bool (*fn_is_pack_start)(void);
 typedef bool (*fn_is_pack_expand)(void);
@@ -15,11 +16,14 @@ typedef bool (*fn_is_pack_fill)(void);
 typedef void (*fn_on_key_press)(GdkEventKey *event);
 typedef void (*fn_on_btn_press)(GdkEventButton *event);
 typedef void (*fn_on_page_change)(void);
+typedef void (*fn_on_new_tab)(WebKitWebView *webview);
+typedef void (*fn_on_tab_switched)(guint page);
 
 // Storage of the different functions a plugin will have
 typedef struct {
     void *handle;
     fn_on_load on_load;
+    fn_on_unload on_unload;
     fn_create_bar_item create_bar_item;
     fn_is_pack_start is_pack_start;
     fn_is_pack_expand is_pack_expand;
@@ -27,6 +31,8 @@ typedef struct {
     fn_on_key_press on_key_press;
     fn_on_btn_press on_btn_press;
     fn_on_page_change on_page_change;
+    fn_on_new_tab on_new_tab;
+    fn_on_tab_switched on_tab_switched;
 } plugin_t;
 
 // Find ~/.config/swb/plugins/ (or equivalent)

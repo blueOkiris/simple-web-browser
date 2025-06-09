@@ -26,6 +26,7 @@ Officially supported platform will be Arch Linux, but binaries will be built for
 
 Dependencies:
 
+- curl
 - \*nix (Arch is the supported platform)
 - gcc
 - gtk3

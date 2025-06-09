@@ -32,6 +32,9 @@ static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpoin
 static void on_tab_reordered(
     GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
 );
+static void on_tab_switched(
+    GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer user_data
+);
 static void load_plugins(void);
 
 int main(int argc, char **argv) {
@@ -83,6 +86,10 @@ void notebook__spawn_tab(GtkNotebook *notebook, const char *const url) {
     gtk_widget_add_events(webview, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(webview, "button-press-event", G_CALLBACK(on_btn_press), NULL);
     g_signal_connect(webview, "notify::uri", G_CALLBACK(on_wv_uri_changed), NULL);
+
+    for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
+        PLUGINS[i].on_new_tab(WEBKIT_WEB_VIEW(webview));
+    }
 }
 
 // Build the UI in the window
@@ -92,8 +99,6 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_window_set_default_size(GTK_WINDOW(win), WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
     GtkWidget *notebook = gtk_notebook_new();
     NOTEBOOK = notebook;
-
-    // TODO: UI
 
     // New tab page
     GtkWidget *new_tab_btn = gtk_button_new_with_label("+");
@@ -125,6 +130,9 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_margin_end(plugin_bar, PADDING);
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         GtkWidget *plugin_widget = PLUGINS[i].create_bar_item(GTK_NOTEBOOK(notebook));
+        if (plugin_widget == NULL) {
+            continue; // Background plugin, like adblock
+        }
         if (PLUGINS[i].is_pack_start()) {
             gtk_box_pack_start(
                 GTK_BOX(plugin_bar), plugin_widget,
@@ -140,13 +148,15 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_show_all(plugin_bar);
 
     // Put them together
-    GtkWidget *outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, SPACING);
+    GtkWidget *outer_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_box_pack_start(GTK_BOX(outer_box), plugin_bar, FALSE, TRUE, PADDING);
     gtk_box_pack_start(GTK_BOX(outer_box), notebook, TRUE, TRUE, 0);
     gtk_container_add(GTK_CONTAINER(win), outer_box);
 
     // Final application signals
     g_signal_connect(win, "key-press-event", G_CALLBACK(on_key_press), NULL);
+    g_signal_connect(notebook, "switch-page", G_CALLBACK(on_tab_switched), NULL);
+
 
     gtk_widget_show_all(win);
 }
@@ -212,6 +222,14 @@ static void on_tab_reordered(
     int max_ind = n_pages - 2;
     if (page_num > max_ind) {
         gtk_notebook_reorder_child(notebook, child, max_ind);
+    }
+}
+
+// Let plugins update their content when selecting a different tab
+static void on_tab_switched(
+        GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer user_data) {
+    for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
+        PLUGINS[i].on_tab_switched(page_num);
     }
 }
 

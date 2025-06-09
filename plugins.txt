@@ -1,3 +1,4 @@
+libswbadblock.so
 libswbbackbtn.so
 libswbfwdbtn.so
 libswbnavbar.so

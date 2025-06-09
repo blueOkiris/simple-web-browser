@@ -3,6 +3,7 @@
         "stdio.h": "c",
         "gtk.h": "c",
         "string.h": "c",
-        "dirent.h": "c"
+        "dirent.h": "c",
+        "webkit2.h": "c"
     }
 }

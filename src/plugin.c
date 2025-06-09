@@ -20,7 +20,6 @@
 #include <plugin.h>
 
 static bool append_fnames(const char *const search_fldr, char ***dest, size_t *len);
-static void ensure_dir(const char *const path);
 
 char *plugin__get_plugin_folder(void) {
     char *buf = malloc(PATH_MAX);
@@ -156,6 +155,19 @@ plugin_t plugin__init(char *fname) {
     }
     plugin.on_load = on_load;
 
+    fn_on_unload on_unload = (fn_on_unload) dlsym(plugin.handle, "plugin__on_unload");
+    if (!on_unload) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_unload': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_unload = on_unload;
+
     fn_create_bar_item create_bar_item =
         (fn_create_bar_item) dlsym(plugin.handle, "plugin__create_bar_item");
     if (!create_bar_item) {
@@ -251,10 +263,38 @@ plugin_t plugin__init(char *fname) {
     }
     plugin.on_page_change = on_page_change;
 
+    fn_on_new_tab on_new_tab = (fn_on_new_tab) dlsym(plugin.handle, "plugin__on_new_tab");
+    if (!on_new_tab) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_new_tab': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_new_tab = on_new_tab;
+
+    fn_on_tab_switched on_tab_switched =
+        (fn_on_tab_switched) dlsym(plugin.handle, "plugin__on_tab_switched");
+    if (!on_tab_switched) {
+        fprintf(
+            stderr,
+            "Warning! Dlsym failed for '%s' on 'plugin__on_tab_switched': %s\n",
+            fname, dlerror()
+        );
+        dlclose(plugin.handle);
+        plugin.handle = NULL;
+        return plugin;
+    }
+    plugin.on_tab_switched = on_tab_switched;
+
     return plugin;
 }
 
 void plugin__unload(plugin_t *plugin) {
+    plugin->on_unload();
     dlclose(plugin->handle);
 }
 
@@ -312,20 +352,3 @@ static int mkdir_p(const char *path, mode_t mode) {
     return mkdir(tmp, mode);  // final directory
 }
 #endif
-
-static void ensure_dir(const char *const path) {
-#ifdef _WIN32
-    if (!CreateDirectoryA(path, NULL)) {
-        if (GetLastError() != ERROR_ALREADY_EXISTS) {
-            fprintf(stderr, "CreateDirectory failed\n");
-        }
-    }
-#else
-    struct stat st = { 0 };
-    if (stat(path, &st) == -1) {
-        if (mkdir_p(path, 0755) == -1) {
-            perror("Warning! Mkdir failed");
-        }
-    }
-#endif
-}

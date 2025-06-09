@@ -18,6 +18,9 @@ int plugin__on_load(void) {
     return MAJOR_VERS;
 }
 
+// When plugin is deinitialized
+void plugin__on_unload(void) {}
+
 // What to put in the navigation bar
 GtkWidget *plugin__create_bar_item(GtkNotebook *notebook) {
     NOTEBOOK = notebook;
@@ -55,6 +58,12 @@ void plugin__on_btn_press(GdkEventButton *event) {}
 
 // When the webview changes pages
 void plugin__on_page_change(void) {}
+
+// When a new tab is created
+void plugin__on_new_tab(WebKitWebView *webview) {}
+
+// When a tab is clicked on
+void plugin__on_tab_switched(guint page) {}
 
 // What to do when our button is clicked
 static void on_click(GtkButton *btn, gpointer user_data) {

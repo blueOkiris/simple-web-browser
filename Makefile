@@ -18,10 +18,12 @@ endif
 LD :=				gcc
 ifdef RELEASE
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
-					$(shell pkg-config --libs webkit2gtk-4.0)
+					$(shell pkg-config --libs webkit2gtk-4.0) \
+					-lcurl
 else
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
-					$(shell pkg-config --libs webkit2gtk-4.0)
+					$(shell pkg-config --libs webkit2gtk-4.0) \
+					-lcurl
 endif
 
 ## Project
