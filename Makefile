@@ -8,21 +8,25 @@ ifdef RELEASE
 CFLAGS :=			-O2 -Wall -Werror -Wno-unused-function \
 					$(shell pkg-config --cflags gtk+-3.0) \
 					$(shell pkg-config --cflags webkit2gtk-4.0) \
+					$(shell pkg-config --cflags libnotify) \
 					-Iinclude
 else
 CFLAGS :=			-g -Wall -Werror -Wno-unused-function \
 					$(shell pkg-config --cflags gtk+-3.0) \
 					$(shell pkg-config --cflags webkit2gtk-4.0) \
+					$(shell pkg-config --cflags libnotify) \
 					-Iinclude
 endif
 LD :=				gcc
 ifdef RELEASE
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
 					$(shell pkg-config --libs webkit2gtk-4.0) \
+					$(shell pkg-config --libs libnotify) \
 					-lcurl
 else
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
 					$(shell pkg-config --libs webkit2gtk-4.0) \
+					$(shell pkg-config --libs libnotify) \
 					-lcurl
 endif
 

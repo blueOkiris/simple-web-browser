@@ -7,6 +7,7 @@
 #include <webkit2/webkit2.h>
 #include <version.h>
 #include <notebook.h>
+#include <libnotify/notify.h>
 #include <plugin.h>
 
 #define APP_ID              "com.polymath-studio.SimpleWebBrowser"
@@ -21,6 +22,7 @@
 static size_t N_PLUGINS_LOADED = 0;
 static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic functions called throughout
 static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
+static GtkWindow *WIN = NULL;
 
 static void on_activate(GtkApplication *app, gpointer user_data);
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data);
@@ -29,6 +31,8 @@ static void spawn_tab(GtkButton *btn, gpointer user_data);
 static void close_tab(GtkButton *btn, gpointer user_data);
 static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data);
 static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data);
+static void on_wv_download(WebKitWebContext *context, WebKitDownload *download, gpointer user_data);
+static void on_wv_download_complete(WebKitDownload *download, gpointer user_data);
 static void on_tab_reordered(
     GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
 );
@@ -87,6 +91,9 @@ void notebook__spawn_tab(GtkNotebook *notebook, const char *const url) {
     g_signal_connect(webview, "button-press-event", G_CALLBACK(on_btn_press), NULL);
     g_signal_connect(webview, "notify::uri", G_CALLBACK(on_wv_uri_changed), NULL);
 
+    WebKitWebContext *ctx = webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview));
+    g_signal_connect(ctx, "download-started", G_CALLBACK(on_wv_download), NULL);
+
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         PLUGINS[i].on_new_tab(WEBKIT_WEB_VIEW(webview));
     }
@@ -95,6 +102,7 @@ void notebook__spawn_tab(GtkNotebook *notebook, const char *const url) {
 // Build the UI in the window
 static void on_activate(GtkApplication *app, gpointer user_data) {
     GtkWidget *win = gtk_application_window_new(app);
+    WIN = GTK_WINDOW(win);
     gtk_window_set_title(GTK_WINDOW(win), WIN_TITLE);
     gtk_window_set_default_size(GTK_WINDOW(win), WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
     GtkWidget *notebook = gtk_notebook_new();
@@ -157,7 +165,6 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(win, "key-press-event", G_CALLBACK(on_key_press), NULL);
     g_signal_connect(notebook, "switch-page", G_CALLBACK(on_tab_switched), NULL);
 
-
     gtk_widget_show_all(win);
 }
 
@@ -213,6 +220,22 @@ static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpoin
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         PLUGINS[i].on_page_change();
     }
+}
+
+// Handle downloads
+static void on_wv_download(
+        WebKitWebContext *context, WebKitDownload *download, gpointer user_data) {
+    g_signal_connect(download, "finished", G_CALLBACK(on_wv_download_complete), NULL);
+}
+
+static void on_wv_download_complete(WebKitDownload *download, gpointer user_data) {
+    const gchar *dest = webkit_download_get_destination(download);
+    printf("[SWB] Download finished: %s\n", dest);
+    notify_init("Download");
+    NotifyNotification *n = notify_notification_new("Download Complete", dest, NULL);
+    notify_notification_show(n, NULL);
+    g_object_unref(n);
+    notify_uninit();
 }
 
 // Don't let the user move a tab past the plus button

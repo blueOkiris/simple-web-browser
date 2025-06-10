@@ -8,7 +8,7 @@ Feature progress:
 - [x] Plugin Loading
 - [x] Navigation and rendering
 - [x] Adblock
-- [ ] Downloads
+- [x] Downloads
 - [ ] Bookmark Storage
 - [ ] Password Storage
 - [ ] Navigation + Tabs (Link Following)
@@ -47,6 +47,7 @@ Dependencies:
 - \*nix (Arch is the supported platform)
 - gcc
 - gtk3
+- libnotify
 - make
 - pkg-config
 - webkit2gtk
