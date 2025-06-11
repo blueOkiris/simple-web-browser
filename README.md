@@ -9,9 +9,9 @@ Feature progress:
 - [x] Navigation and rendering
 - [x] Adblock
 - [x] Downloads
+- [x] Navigation + Tabs (Link Following)
 - [ ] Bookmark Storage
 - [ ] Password Storage
-- [ ] Navigation + Tabs (Link Following)
 - [ ] PKGBUILD
 
 ![screenshot](./img/screenshot-2025_06_09.png)

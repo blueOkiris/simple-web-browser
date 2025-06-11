@@ -31,10 +31,13 @@ static gboolean on_btn_press(GtkWidget *widget, GdkEventButton *event, gpointer 
 static void spawn_tab(GtkButton *btn, gpointer user_data);
 static void close_tab(GtkButton *btn, gpointer user_data);
 static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpointer user_data);
-static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data);
+static void on_wv_uri_changed(WebKitWebView *webview,  GParamSpec *pspec, gpointer user_data);
 static void on_wv_download(WebKitWebContext *context, WebKitDownload *download, gpointer user_data);
 static void on_wv_download_complete(WebKitDownload *download, gpointer user_data);
 static void on_wv_download_failed(WebKitDownload *download, GError *error, gpointer user_data);
+static WebKitWebView *on_wv_create(
+    WebKitWebView *webview, WebKitNavigationAction *nav, gpointer user_data
+);
 static void on_tab_reordered(
     GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
 );
@@ -92,6 +95,7 @@ void notebook__spawn_tab(GtkNotebook *notebook, const char *const url) {
     gtk_widget_add_events(webview, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(webview, "button-press-event", G_CALLBACK(on_btn_press), NULL);
     g_signal_connect(webview, "notify::uri", G_CALLBACK(on_wv_uri_changed), NULL);
+    g_signal_connect(webview, "create", G_CALLBACK(on_wv_create), NULL);
 
     WebKitWebContext *ctx = webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview));
     g_signal_connect(ctx, "download-started", G_CALLBACK(on_wv_download), NULL);
@@ -220,7 +224,7 @@ static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpoin
 }
 
 // When a webpage is loaded, we tell the plugins
-static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data) {
+static void on_wv_uri_changed(WebKitWebView *webview,  GParamSpec *pspec, gpointer user_data) {
     for (size_t i = 0; i < N_PLUGINS_LOADED; i++) {
         PLUGINS[i].on_page_change();
     }
@@ -289,6 +293,22 @@ static void on_wv_download_failed(WebKitDownload *download, GError *error, gpoin
     notify_notification_show(n, NULL);
     g_object_unref(n);
     notify_uninit();
+}
+
+// When user wants to "open in a new tab"
+static WebKitWebView *on_wv_create(
+        WebKitWebView *webview, WebKitNavigationAction *nav, gpointer user_data) {
+    const gchar *uri = NULL;
+    if (nav) {
+        WebKitURIRequest *req = webkit_navigation_action_get_request(nav);
+        if (req) {
+            uri = webkit_uri_request_get_uri(req);
+        }
+    }
+    notebook__spawn_tab(
+        GTK_NOTEBOOK(NOTEBOOK), uri ? uri : "https://search.brave.com"
+    );
+    return NULL;
 }
 
 // Don't let the user move a tab past the plus button
