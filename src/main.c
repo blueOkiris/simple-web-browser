@@ -20,9 +20,10 @@
 #define MICRO_BTN_HEIGHT    16
 
 static size_t N_PLUGINS_LOADED = 0;
-static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic functions called throughout
+static plugin_t *PLUGINS = NULL; // A collection of N_PLUGINS_LOADED dynamic functions
 static GtkWidget *NOTEBOOK = NULL; // Reference to tab page. Use sparingly
 static GtkWindow *WIN = NULL;
+static GHashTable *DOWNLOADS = NULL; // Keep track of downloads so we don't loop forever
 
 static void on_activate(GtkApplication *app, gpointer user_data);
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data);
@@ -33,6 +34,7 @@ static void on_wv_title_changed(WebKitWebView *webview, GParamSpec *pspec, gpoin
 static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpointer user_data);
 static void on_wv_download(WebKitWebContext *context, WebKitDownload *download, gpointer user_data);
 static void on_wv_download_complete(WebKitDownload *download, gpointer user_data);
+static void on_wv_download_failed(WebKitDownload *download, GError *error, gpointer user_data);
 static void on_tab_reordered(
     GtkNotebook *notebook, GtkWidget *child, guint page_num, gpointer user_data
 );
@@ -107,6 +109,8 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     gtk_window_set_default_size(GTK_WINDOW(win), WIN_DEF_WIDTH, WIN_DEF_HEIGHT);
     GtkWidget *notebook = gtk_notebook_new();
     NOTEBOOK = notebook;
+
+    DOWNLOADS = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
     // New tab page
     GtkWidget *new_tab_btn = gtk_button_new_with_label("+");
@@ -225,14 +229,63 @@ static void on_wv_uri_changed(WebKitWebView *web_view,  GParamSpec *pspec, gpoin
 // Handle downloads
 static void on_wv_download(
         WebKitWebContext *context, WebKitDownload *download, gpointer user_data) {
-    g_signal_connect(download, "finished", G_CALLBACK(on_wv_download_complete), NULL);
+    const gchar *uri = webkit_uri_request_get_uri(webkit_download_get_request(download));
+
+    // Check if we've already restarted downloading this file
+    if (g_hash_table_contains(DOWNLOADS, uri)) {
+        g_hash_table_remove(DOWNLOADS, uri);
+        return;
+    }
+
+    // Otherwise, cancel, and let user choose a save location
+    webkit_download_cancel(download);
+    g_hash_table_insert(DOWNLOADS, g_strdup(uri), GINT_TO_POINTER(1));
+    GtkWidget *dialog = gtk_file_chooser_dialog_new(
+        "Save File", WIN, GTK_FILE_CHOOSER_ACTION_SAVE,
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Save", GTK_RESPONSE_ACCEPT,
+        NULL
+    );
+    gchar *filename = g_path_get_basename(uri);
+    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), filename);
+    g_free(filename);
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        gchar *filepath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        gchar *dest_uri = g_strdup_printf("file://%s", filepath);
+        WebKitDownload *new_download = webkit_web_context_download_uri(context, uri);
+        webkit_download_set_destination(new_download, dest_uri);
+        g_signal_connect(new_download, "finished", G_CALLBACK(on_wv_download_complete), NULL);
+        g_signal_connect(new_download, "failed", G_CALLBACK(on_wv_download_failed), NULL);
+        g_free(dest_uri);
+        g_free(filepath);
+    }
+
+    gtk_widget_destroy(dialog);
 }
 
 static void on_wv_download_complete(WebKitDownload *download, gpointer user_data) {
+    const gchar *uri = webkit_uri_request_get_uri(webkit_download_get_request(download));
+    g_hash_table_remove(DOWNLOADS, uri);
     const gchar *dest = webkit_download_get_destination(download);
     printf("[SWB] Download finished: %s\n", dest);
     notify_init("Download");
     NotifyNotification *n = notify_notification_new("Download Complete", dest, NULL);
+    notify_notification_show(n, NULL);
+    g_object_unref(n);
+    notify_uninit();
+}
+
+static void on_wv_download_failed(WebKitDownload *download, GError *error, gpointer user_data) {
+    // Ignore cancels
+    if (g_error_matches(error, WEBKIT_DOWNLOAD_ERROR, WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER)) {
+        return;
+    }
+    const gchar *uri = webkit_uri_request_get_uri(webkit_download_get_request(download));
+    g_hash_table_remove(DOWNLOADS, uri);
+    const gchar *dest = webkit_download_get_destination(download);
+    printf("[SWB] Download failed: %s\n", dest);
+    notify_init("Download Failed");
+    NotifyNotification *n = notify_notification_new("Download Failed", dest, NULL);
     notify_notification_show(n, NULL);
     g_object_unref(n);
     notify_uninit();
