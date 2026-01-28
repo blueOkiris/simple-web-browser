@@ -14,18 +14,20 @@ ifdef RELEASE
 CFLAGS :=		-O2 -Wall -Werror -Wno-unused-function -fPIC \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
+				$(shell pkg-config --cflags json-c) \
 				-Iinclude
 else
 CFLAGS :=		-g -Wall -Werror -Wno-unused-function -fPIC \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
+				$(shell pkg-config --cflags json-c) \
 				-Iinclude
 endif
 LD :=			gcc
 ifdef RELEASE
-LDFLAGS :=		-shared
+LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl
 else
-LDFLAGS :=		-shared
+LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl
 endif
 
 ## Project

@@ -7,13 +7,22 @@
 #include <gtk/gtk.h>
 #include <curl/curl.h>
 #include <webkit2/webkit2.h>
+#include <json-c/json.h>
 #include "../../../include/plugin.h"
 
 #define MAJOR_VERS      1
 
-#define FILTER_LIST_URL \
-    "https://raw.githubusercontent.com/dgraham/Ka-Block/refs/heads/master/Extension/" \
-        "blockerList.json"
+// Structure to hold response data from curl
+typedef struct {
+    char *data;
+    size_t size;
+} resp_t;
+
+// Array of filter list URLs to fetch and combine
+static const char *FILTER_LIST_URLS[] = {
+    "https://raw.githubusercontent.com/dgraham/Ka-Block/refs/heads/master/"
+        "Extension/blockerList.json"
+};
 
 bool FILTER_LIST_REFRESHED = false;
 static WebKitUserContentFilterStore *FILTER_STORE = NULL;
@@ -22,6 +31,8 @@ static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 static void on_filter_load(GObject *caller, GAsyncResult *res, void *conmgr);
 static void on_filter_save(GObject *caller, GAsyncResult *res, void *conmgr);
 static char *get_filter_list(void);
+static char *fetch_url_to_string(const char *url);
+static char *combine_json_arrays(void);
 
 // When the plugin first gets loaded in. Return Major version supported
 int plugin__on_load(void) {
@@ -122,39 +133,96 @@ static void on_filter_save(GObject *caller, GAsyncResult *res, void *conmgr) {
     }
 }
 
-static size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    return fwrite(ptr, size, nmemb, stream);
+
+static size_t write_response_cb(void *contents, size_t size, size_t nmemb, resp_t *response) {
+    size_t realsize = size * nmemb;
+    char *ptr = realloc(response->data, response->size + realsize + 1);
+    if (!ptr) {
+        printf("[Swb Adblock] Error: Not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+    response->data = ptr;
+    memcpy(&(response->data[response->size]), contents, realsize);
+    response->size += realsize;
+    response->data[response->size] = 0;
+    return realsize;
+}
+
+static char *fetch_url_to_string(const char *url) {
+    CURL *curl = NULL;
+    CURLcode res = { 0 };
+    resp_t resp = { 0 };
+    curl = curl_easy_init();
+    if (!curl) {
+        return NULL;
+    }
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    if (res != CURLE_OK) {
+        printf("[Swb Adblock] Error fetching %s: %s\n", url, curl_easy_strerror(res));
+        if (resp.data) {
+            free(resp.data);
+        }
+        return NULL;
+    }
+    return resp.data;
+}
+
+static char *combine_json_arrays(void) {
+    json_object *combined_array = json_object_new_array();
+    if (!combined_array) {
+        printf("[Swb Adblock] Error: Failed to create JSON array\n");
+        return NULL;
+    }
+    size_t num_urls = sizeof(FILTER_LIST_URLS) / sizeof(FILTER_LIST_URLS[0]);
+    for (size_t i = 0; i < num_urls; i++) {
+        printf("[Swb Adblock] Fetching filter list from: %s\n", FILTER_LIST_URLS[i]);
+        char *json_data = fetch_url_to_string(FILTER_LIST_URLS[i]);
+        if (!json_data) {
+            printf("[Swb Adblock] Warning: Failed to fetch %s\n", FILTER_LIST_URLS[i]);
+            continue;
+        }
+        json_object *parsed_json = json_tokener_parse(json_data);
+        free(json_data);
+        if (!parsed_json) {
+            printf("[Swb Adblock] Warning: Failed to parse JSON from %s\n", FILTER_LIST_URLS[i]);
+            continue;
+        }
+        if (!json_object_is_type(parsed_json, json_type_array)) {
+            printf("[Swb Adblock] Warning: JSON from %s is not an array\n", FILTER_LIST_URLS[i]);
+            json_object_put(parsed_json);
+            continue;
+        }
+
+        // Add all elements from this array to the combined array
+        int array_len = json_object_array_length(parsed_json);
+        for (int j = 0; j < array_len; j++) {
+            json_object *element = json_object_array_get_idx(parsed_json, j);
+            if (element) {
+                // Increment reference count since we're adding it to another array
+                json_object_get(element);
+                json_object_array_add(combined_array, element);
+            }
+        }
+        json_object_put(parsed_json);
+        printf("[Swb Adblock] Added %d filters from %s\n", array_len, FILTER_LIST_URLS[i]);
+    }
+
+    const char *json_string = json_object_to_json_string(combined_array);
+    char *result = strdup(json_string);
+    if (result) {
+        int total_filters = json_object_array_length(combined_array);
+        printf("[Swb Adblock] Combined filter list created with %d total filters\n", total_filters);
+    }
+    json_object_put(combined_array);
+    return result;
 }
 
 static char *get_filter_list(void) {
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        FILE *fp = fopen("/tmp/filter_list.json", "wb");
-        if (!fp) {
-            return NULL;
-        }
-        curl_easy_setopt(curl, CURLOPT_URL, FILTER_LIST_URL);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-        curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
-        fclose(fp);
-        fp = fopen("/tmp/filter_list.json", "r");
-        if (!fp) {
-            return NULL;
-        }
-        fseek(fp, 0, SEEK_END);
-        size_t size = ftell(fp);
-        rewind(fp);
-        char *buff = malloc(size + 1);
-        if (!buff) {
-            fclose(fp);
-            return NULL;
-        }
-        fread(buff, 1, size, fp);
-        fclose(fp);
-        buff[size] = '\0';
-        return buff;
-    }
-    return NULL;
+    return combine_json_arrays();
 }
