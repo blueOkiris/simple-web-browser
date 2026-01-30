@@ -8,6 +8,7 @@
 #include <curl/curl.h>
 #include <webkit2/webkit2.h>
 #include <json-c/json.h>
+#include <omp.h>
 #include "../../../include/plugin.h"
 #include "../adguard2webkit/include/adguard2webkit.h"
 
@@ -224,39 +225,62 @@ static char *combine_json_arrays(void) {
         printf("[Swb Adblock] Error: Failed to create JSON array\n");
         return NULL;
     }
+
     size_t num_urls = sizeof(FILTER_LIST_URLS) / sizeof(FILTER_LIST_URLS[0]);
+
+    // Arrays to store results from parallel fetching
+    char **json_data_array = calloc(num_urls, sizeof(char*));
+    json_object **parsed_json_array = calloc(num_urls, sizeof(json_object*));
+    if (!json_data_array || !parsed_json_array) {
+        printf("[Swb Adblock] Error: Failed to allocate memory for parallel processing\n");
+        free(json_data_array);
+        free(parsed_json_array);
+        json_object_put(combined_array);
+        return NULL;
+    }
+
+    // Parallel fetch of all URLs
+    #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < num_urls; i++) {
-        printf("[Swb Adblock] Fetching filter list from: %s\n", FILTER_LIST_URLS[i]);
-        char *json_data = fetch_url_to_string(FILTER_LIST_URLS[i]);
-        if (!json_data) {
+        json_data_array[i] = fetch_url_to_string(FILTER_LIST_URLS[i]);
+        if (!json_data_array[i]) {
             printf("[Swb Adblock] Warning: Failed to fetch %s\n", FILTER_LIST_URLS[i]);
             continue;
         }
-        json_object *parsed_json = json_tokener_parse(json_data);
-        free(json_data);
-        if (!parsed_json) {
+        parsed_json_array[i] = json_tokener_parse(json_data_array[i]);
+        if (!parsed_json_array[i]) {
             printf("[Swb Adblock] Warning: Failed to parse JSON from %s\n", FILTER_LIST_URLS[i]);
             continue;
         }
-        if (!json_object_is_type(parsed_json, json_type_array)) {
+        if (!json_object_is_type(parsed_json_array[i], json_type_array)) {
             printf("[Swb Adblock] Warning: JSON from %s is not an array\n", FILTER_LIST_URLS[i]);
-            json_object_put(parsed_json);
+            json_object_put(parsed_json_array[i]);
+            parsed_json_array[i] = NULL;
             continue;
         }
-
-        // Add all elements from this array to the combined array
-        int array_len = json_object_array_length(parsed_json);
-        for (int j = 0; j < array_len; j++) {
-            json_object *element = json_object_array_get_idx(parsed_json, j);
-            if (element) {
-                // Increment reference count since we're adding it to another array
-                json_object_get(element);
-                json_object_array_add(combined_array, element);
-            }
-        }
-        json_object_put(parsed_json);
-        printf("[Swb Adblock] Added %d filters from %s\n", array_len, FILTER_LIST_URLS[i]);
     }
+
+    // Sequential merge of results (must be sequential due to json-c thread safety)
+    for (size_t i = 0; i < num_urls; i++) {
+        if (parsed_json_array[i]) {
+            int array_len = json_object_array_length(parsed_json_array[i]);
+            for (int j = 0; j < array_len; j++) {
+                json_object *element = json_object_array_get_idx(parsed_json_array[i], j);
+                if (element) {
+                    // Increment reference count since we're adding it to another array
+                    json_object_get(element);
+                    json_object_array_add(combined_array, element);
+                }
+            }
+            json_object_put(parsed_json_array[i]);
+        }
+        if (json_data_array[i]) {
+            free(json_data_array[i]);
+        }
+    }
+
+    free(json_data_array);
+    free(parsed_json_array);
 
     const char *json_string = json_object_to_json_string(combined_array);
     char *result = strdup(json_string);
@@ -274,11 +298,27 @@ static char *convert_adguard_rules_to_json(void) {
         printf("[Swb Adblock] Error: Failed to create JSON array for AdGuard rules\n");
         return NULL;
     }
+
     size_t num_urls = sizeof(FILTER_LIST_URLS_ADGUARD) / sizeof(FILTER_LIST_URLS_ADGUARD[0]);
+
+    // Arrays to store results from parallel fetching and conversion
+    char **rules_data_array = calloc(num_urls, sizeof(char*));
+    char **webkit_json_array = calloc(num_urls, sizeof(char*));
+    json_object **parsed_json_array = calloc(num_urls, sizeof(json_object*));
+    if (!rules_data_array || !webkit_json_array || !parsed_json_array) {
+        printf("[Swb Adblock] Error: Failed to allocate memory for parallel AdGuard processing\n");
+        free(rules_data_array);
+        free(webkit_json_array);
+        free(parsed_json_array);
+        json_object_put(combined_array);
+        return NULL;
+    }
+
+    // Parallel fetch and conversion of all AdGuard URLs
+    #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < num_urls; i++) {
-        printf("[Swb Adblock] Fetching AdGuard rules from: %s\n", FILTER_LIST_URLS_ADGUARD[i]);
-        char *rules_data = fetch_url_to_string(FILTER_LIST_URLS_ADGUARD[i]);
-        if (!rules_data) {
+        rules_data_array[i] = fetch_url_to_string(FILTER_LIST_URLS_ADGUARD[i]);
+        if (!rules_data_array[i]) {
             printf(
                 "[Swb Adblock] Warning: Failed to fetch AdGuard rules from %s\n",
                 FILTER_LIST_URLS_ADGUARD[i]
@@ -287,9 +327,8 @@ static char *convert_adguard_rules_to_json(void) {
         }
 
         // Convert AdGuard rules to WebKit JSON format
-        char *webkit_json = adguard2webkit__convert(rules_data);
-        free(rules_data);
-        if (!webkit_json) {
+        webkit_json_array[i] = adguard2webkit__convert(rules_data_array[i]);
+        if (!webkit_json_array[i]) {
             printf(
                 "[Swb Adblock] Warning: Failed to convert AdGuard rules from %s\n",
                 FILTER_LIST_URLS_ADGUARD[i]
@@ -297,40 +336,49 @@ static char *convert_adguard_rules_to_json(void) {
             continue;
         }
 
-        json_object *parsed_json = json_tokener_parse(webkit_json);
-        free(webkit_json);
-        if (!parsed_json) {
+        parsed_json_array[i] = json_tokener_parse(webkit_json_array[i]);
+        if (!parsed_json_array[i]) {
             printf(
                 "[Swb Adblock] Warning: Failed to parse converted JSON from %s\n",
                 FILTER_LIST_URLS_ADGUARD[i]
             );
             continue;
         }
-        if (!json_object_is_type(parsed_json, json_type_array)) {
+        if (!json_object_is_type(parsed_json_array[i], json_type_array)) {
             printf(
                 "[Swb Adblock] Warning: Converted JSON from %s is not an array\n",
                 FILTER_LIST_URLS_ADGUARD[i]
             );
-            json_object_put(parsed_json);
+            json_object_put(parsed_json_array[i]);
+            parsed_json_array[i] = NULL;
             continue;
         }
-
-        // Add all elements from this array to the combined array
-        int array_len = json_object_array_length(parsed_json);
-        for (int j = 0; j < array_len; j++) {
-            json_object *element = json_object_array_get_idx(parsed_json, j);
-            if (element) {
-                // Increment reference count since we're adding it to another array
-                json_object_get(element);
-                json_object_array_add(combined_array, element);
-            }
-        }
-        json_object_put(parsed_json);
-        printf(
-            "[Swb Adblock] Added %d converted AdGuard filters from %s\n",
-            array_len, FILTER_LIST_URLS_ADGUARD[i]
-        );
     }
+
+    // Sequential merge of results (must be sequential due to json-c thread safety)
+    for (size_t i = 0; i < num_urls; i++) {
+        if (parsed_json_array[i]) {
+            int array_len = json_object_array_length(parsed_json_array[i]);
+            for (int j = 0; j < array_len; j++) {
+                json_object *element = json_object_array_get_idx(parsed_json_array[i], j);
+                if (element) {
+                    // Increment reference count since we're adding it to another array
+                    json_object_get(element);
+                    json_object_array_add(combined_array, element);
+                }
+            }
+            json_object_put(parsed_json_array[i]);
+        }
+        if (rules_data_array[i]) {
+            free(rules_data_array[i]);
+        }
+        if (webkit_json_array[i]) {
+            free(webkit_json_array[i]);
+        }
+    }
+    free(rules_data_array);
+    free(webkit_json_array);
+    free(parsed_json_array);
 
     const char *json_string = json_object_to_json_string(combined_array);
     char *result = strdup(json_string);
@@ -380,22 +428,55 @@ static char *get_filter_list(void) {
         json_object_put(adguard_array);
         return NULL;
     }
+
     int json_len = json_object_array_length(json_array);
-    for (int i = 0; i < json_len; i++) {
-        json_object *element = json_object_array_get_idx(json_array, i);
-        if (element) {
-            json_object_get(element);
-            json_object_array_add(combined_array, element);
-        }
-    }
     int adguard_len = json_object_array_length(adguard_array);
-    for (int i = 0; i < adguard_len; i++) {
-        json_object *element = json_object_array_get_idx(adguard_array, i);
-        if (element) {
-            json_object_get(element);
-            json_object_array_add(combined_array, element);
+    int total_len = json_len + adguard_len;
+
+    // Create temporary arrays to hold elements for parallel processing
+    json_object **temp_elements = calloc(total_len, sizeof(json_object*));
+    if (!temp_elements) {
+        printf("[Swb Adblock] Error: Failed to allocate memory for parallel merging\n");
+        json_object_put(json_array);
+        json_object_put(adguard_array);
+        json_object_put(combined_array);
+        return NULL;
+    }
+
+    // Parallel extraction of elements from both arrays
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            // Process JSON array elements
+            for (int i = 0; i < json_len; i++) {
+                json_object *element = json_object_array_get_idx(json_array, i);
+                if (element) {
+                    json_object_get(element);
+                    temp_elements[i] = element;
+                }
+            }
+        }
+        #pragma omp section
+        {
+            // Process AdGuard array elements
+            for (int i = 0; i < adguard_len; i++) {
+                json_object *element = json_object_array_get_idx(adguard_array, i);
+                if (element) {
+                    json_object_get(element);
+                    temp_elements[json_len + i] = element;
+                }
+            }
         }
     }
+
+    // Sequential addition to combined array (json-c is not thread-safe for array modifications)
+    for (int i = 0; i < total_len; i++) {
+        if (temp_elements[i]) {
+            json_object_array_add(combined_array, temp_elements[i]);
+        }
+    }
+    free(temp_elements);
     json_object_put(json_array);
     json_object_put(adguard_array);
 

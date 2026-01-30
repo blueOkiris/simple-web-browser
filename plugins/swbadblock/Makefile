@@ -11,13 +11,13 @@ MXE_TARGET :=	x86_64-w64-mingw32.static
 
 CC :=			gcc
 ifdef RELEASE
-CFLAGS :=		-O2 -Wall -Werror -Wno-unused-function -fPIC \
+CFLAGS :=		-O2 -Wall -Werror -Wno-unused-function -fPIC -fopenmp \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
 				$(shell pkg-config --cflags json-c) \
 				-Iinclude
 else
-CFLAGS :=		-g -Wall -Werror -Wno-unused-function -fPIC \
+CFLAGS :=		-g -Wall -Werror -Wno-unused-function -fPIC -fopenmp \
 				$(shell pkg-config --cflags gtk+-3.0) \
 				$(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0) \
 				$(shell pkg-config --cflags json-c) \
@@ -25,9 +25,9 @@ CFLAGS :=		-g -Wall -Werror -Wno-unused-function -fPIC \
 endif
 LD :=			gcc
 ifdef RELEASE
-LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl
+LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl -fopenmp
 else
-LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl
+LDFLAGS :=		-shared $(shell pkg-config --libs json-c) -lcurl -fopenmp
 endif
 
 ## Project
@@ -89,7 +89,7 @@ $(SCL_DIR)/Package.swift: adguard2webkit/v$(SCL_VERS).tar.gz
 	cd adguard2webkit && tar -xzf v$(SCL_VERS).tar.gz
 	cd $(SCL_DIR) && patch -p0 < ../scl-package-reduction.patch
 
-$(AG2WK_LIB): $(SCL_DIR)/Package.swift $(wildcard adguard2webkit/Sources/*.swift)
+$(AG2WK_LIB): $(SCL_DIR)/Package.swift adguard2webkit/Package.swift $(wildcard adguard2webkit/Sources/*/*.swift)
 	cd adguard2webkit && swift build $(SWIFTFLAGS)
 
 ## Main

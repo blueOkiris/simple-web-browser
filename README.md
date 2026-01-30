@@ -53,6 +53,7 @@ Dependencies:
 - webkit2gtk
 - json-c (for adblock plugin)
 - swift 6 w/ embedded swift support (for adblock plugin)
+- openmp (for adblock plugin)
 
 `make RELEASE=1`
 
@@ -83,3 +84,4 @@ The default plugins:
       * AdGuard Lists (Primary) converted into WebKit format
          - BaseFilter
          - Annoyances
+   + NOTE: Filter list is updated on startup, which causes a slow start. Feel free to remove or replace this plugin with another that's too your liking
