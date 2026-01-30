@@ -82,3 +82,4 @@ The default plugins:
          - YouTube Filter
       * AdGuard Lists (Primary) converted into WebKit format
          - BaseFilter
+         - Annoyances

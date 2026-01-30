@@ -11,7 +11,9 @@
 #include "../../../include/plugin.h"
 #include "../adguard2webkit/include/adguard2webkit.h"
 
-#define MAJOR_VERS      1
+#define MAJOR_VERS          1
+#define ADGUARD_URL_BASE    \
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
 
 // Structure to hold response data from curl
 typedef struct {
@@ -27,34 +29,43 @@ static const char *FILTER_LIST_URLS[] = {
         "AdguardExtension/YouTubeAdsActionExtension/filter.json"
 };
 static const char *FILTER_LIST_URLS_ADGUARD[] = {
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/adservers.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/adservers_firstparty.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/allowlist.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/allowlist_stealth.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/antiadblock.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/banner_sizes.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/content_blocker.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/cryptominers.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/foreign.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/general_elemhide.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/general_extensions.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/general_url.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/replace.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
-        "BaseFilter/sections/specific.txt"
+    // AdGuard Base Filter
+    ADGUARD_URL_BASE "BaseFilter/sections/adservers.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/adservers_firstparty.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/allowlist.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/allowlist_stealth.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/antiadblock.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/banner_sizes.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/content_blocker.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/cryptominers.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/foreign.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/general_elemhide.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/general_extensions.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/general_url.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/replace.txt",
+    ADGUARD_URL_BASE "BaseFilter/sections/specific.txt",
+
+    // AdGuard Annoyances Filter
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_allowlist.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_general.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_allowlist.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_general.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/annoyances.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/self-promo.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/tweaks.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/antiadblock.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_allowlist.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_general.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_allowlist.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_general.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_allowlist.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_general.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Widgets/sections/widgets.txt"
 };
 
 bool FILTER_LIST_REFRESHED = false;
