@@ -1,5 +1,7 @@
 # Project settings
 
+COMMA := ,
+
 ## Compiler
 
 CC :=				gcc
@@ -17,17 +19,24 @@ CFLAGS :=			-g -Wall -Werror -Wno-unused-function \
 					$(shell pkg-config --cflags libnotify) \
 					-Iinclude
 endif
+SWIFT_LIB_PATH := 	$(shell swift -print-target-info 2>/dev/null | grep -A1 runtimeLibraryPaths | tail -1 | sed 's/.*"\([^"]*\)".*/\1/')
 LD :=				gcc
 ifdef RELEASE
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
 					$(shell pkg-config --libs webkit2gtk-4.0) \
 					$(shell pkg-config --libs libnotify) \
-					-lcurl
+					-lcurl \
+					$(if $(SWIFT_LIB_PATH),-L$(SWIFT_LIB_PATH) -Wl$(COMMA)-rpath$(COMMA)$(SWIFT_LIB_PATH)) \
+					-lswiftCore -lswift_Concurrency -lswiftGlibc -ldispatch -lBlocksRuntime \
+					-lFoundation -lFoundationEssentials -lswiftRuntime -lswiftSwiftOnoneSupport
 else
 LDFLAGS :=			$(shell pkg-config --libs gtk+-3.0) \
 					$(shell pkg-config --libs webkit2gtk-4.0) \
 					$(shell pkg-config --libs libnotify) \
-					-lcurl
+					-lcurl \
+					$(if $(SWIFT_LIB_PATH),-L$(SWIFT_LIB_PATH) -Wl$(COMMA)-rpath$(COMMA)$(SWIFT_LIB_PATH)) \
+					-lswiftCore -lswift_Concurrency -lswiftGlibc -ldispatch -lBlocksRuntime \
+					-lFoundation -lFoundationEssentials -lswiftRuntime -lswiftSwiftOnoneSupport
 endif
 
 ## Project

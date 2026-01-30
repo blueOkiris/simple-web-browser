@@ -51,7 +51,8 @@ Dependencies:
 - make
 - pkg-config
 - webkit2gtk
-- json-c
+- json-c (for adblock plugin)
+- swift 6 w/ embedded swift support (for adblock plugin)
 
 `make RELEASE=1`
 
@@ -77,4 +78,7 @@ The default plugins:
    + Simple AdBlock based on filtering rules
    + Filter lists:
       * Ka-Block!:`https://github.com/dgraham/Ka-Block`
-
+      * AdGuard Lists (from Safari iOS Extensions)
+         - YouTube Filter
+      * AdGuard Lists (Primary) converted into WebKit format
+         - BaseFilter

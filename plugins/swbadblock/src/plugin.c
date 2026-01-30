@@ -9,6 +9,7 @@
 #include <webkit2/webkit2.h>
 #include <json-c/json.h>
 #include "../../../include/plugin.h"
+#include "../adguard2webkit/include/adguard2webkit.h"
 
 #define MAJOR_VERS      1
 
@@ -21,7 +22,39 @@ typedef struct {
 // Array of filter list URLs to fetch and combine
 static const char *FILTER_LIST_URLS[] = {
     "https://raw.githubusercontent.com/dgraham/Ka-Block/refs/heads/master/"
-        "Extension/blockerList.json"
+        "Extension/blockerList.json",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardForiOS/refs/heads/master/"
+        "AdguardExtension/YouTubeAdsActionExtension/filter.json"
+};
+static const char *FILTER_LIST_URLS_ADGUARD[] = {
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/adservers.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/adservers_firstparty.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/allowlist.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/allowlist_stealth.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/antiadblock.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/banner_sizes.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/content_blocker.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/cryptominers.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/foreign.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/general_elemhide.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/general_extensions.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/general_url.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/replace.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/refs/heads/master/"
+        "BaseFilter/sections/specific.txt"
 };
 
 bool FILTER_LIST_REFRESHED = false;
@@ -33,6 +66,7 @@ static void on_filter_save(GObject *caller, GAsyncResult *res, void *conmgr);
 static char *get_filter_list(void);
 static char *fetch_url_to_string(const char *url);
 static char *combine_json_arrays(void);
+static char *convert_adguard_rules_to_json(void);
 
 // When the plugin first gets loaded in. Return Major version supported
 int plugin__on_load(void) {
@@ -223,6 +257,147 @@ static char *combine_json_arrays(void) {
     return result;
 }
 
+static char *convert_adguard_rules_to_json(void) {
+    json_object *combined_array = json_object_new_array();
+    if (!combined_array) {
+        printf("[Swb Adblock] Error: Failed to create JSON array for AdGuard rules\n");
+        return NULL;
+    }
+    size_t num_urls = sizeof(FILTER_LIST_URLS_ADGUARD) / sizeof(FILTER_LIST_URLS_ADGUARD[0]);
+    for (size_t i = 0; i < num_urls; i++) {
+        printf("[Swb Adblock] Fetching AdGuard rules from: %s\n", FILTER_LIST_URLS_ADGUARD[i]);
+        char *rules_data = fetch_url_to_string(FILTER_LIST_URLS_ADGUARD[i]);
+        if (!rules_data) {
+            printf(
+                "[Swb Adblock] Warning: Failed to fetch AdGuard rules from %s\n",
+                FILTER_LIST_URLS_ADGUARD[i]
+            );
+            continue;
+        }
+
+        // Convert AdGuard rules to WebKit JSON format
+        char *webkit_json = adguard2webkit__convert(rules_data);
+        free(rules_data);
+        if (!webkit_json) {
+            printf(
+                "[Swb Adblock] Warning: Failed to convert AdGuard rules from %s\n",
+                FILTER_LIST_URLS_ADGUARD[i]
+            );
+            continue;
+        }
+
+        json_object *parsed_json = json_tokener_parse(webkit_json);
+        free(webkit_json);
+        if (!parsed_json) {
+            printf(
+                "[Swb Adblock] Warning: Failed to parse converted JSON from %s\n",
+                FILTER_LIST_URLS_ADGUARD[i]
+            );
+            continue;
+        }
+        if (!json_object_is_type(parsed_json, json_type_array)) {
+            printf(
+                "[Swb Adblock] Warning: Converted JSON from %s is not an array\n",
+                FILTER_LIST_URLS_ADGUARD[i]
+            );
+            json_object_put(parsed_json);
+            continue;
+        }
+
+        // Add all elements from this array to the combined array
+        int array_len = json_object_array_length(parsed_json);
+        for (int j = 0; j < array_len; j++) {
+            json_object *element = json_object_array_get_idx(parsed_json, j);
+            if (element) {
+                // Increment reference count since we're adding it to another array
+                json_object_get(element);
+                json_object_array_add(combined_array, element);
+            }
+        }
+        json_object_put(parsed_json);
+        printf(
+            "[Swb Adblock] Added %d converted AdGuard filters from %s\n",
+            array_len, FILTER_LIST_URLS_ADGUARD[i]
+        );
+    }
+
+    const char *json_string = json_object_to_json_string(combined_array);
+    char *result = strdup(json_string);
+    if (result) {
+        int total_filters = json_object_array_length(combined_array);
+        printf(
+            "[Swb Adblock] Converted AdGuard filter list created with %d total filters\n",
+            total_filters
+        );
+    }
+    json_object_put(combined_array);
+    return result;
+}
+
 static char *get_filter_list(void) {
-    return combine_json_arrays();
+    // Get existing JSON filters
+    char *json_filters = combine_json_arrays();
+    if (!json_filters) {
+        printf("[Swb Adblock] Warning: Failed to get JSON filters, using only AdGuard rules\n");
+        return convert_adguard_rules_to_json();
+    }
+
+    // Get converted AdGuard rules
+    char *adguard_filters = convert_adguard_rules_to_json();
+    if (!adguard_filters) {
+        printf("[Swb Adblock] Warning: Failed to convert AdGuard rules, using only JSON filters\n");
+        return json_filters;
+    }
+
+    // Parse both JSON arrays
+    json_object *json_array = json_tokener_parse(json_filters);
+    json_object *adguard_array = json_tokener_parse(adguard_filters);
+    free(json_filters);
+    free(adguard_filters);
+    if (!json_array || !adguard_array) {
+        printf("[Swb Adblock] Error: Failed to parse filter arrays for combination\n");
+        if (json_array) json_object_put(json_array);
+        if (adguard_array) json_object_put(adguard_array);
+        return NULL;
+    }
+
+    // Add JSON filters to combined array
+    json_object *combined_array = json_object_new_array();
+    if (!combined_array) {
+        printf("[Swb Adblock] Error: Failed to create combined JSON array\n");
+        json_object_put(json_array);
+        json_object_put(adguard_array);
+        return NULL;
+    }
+    int json_len = json_object_array_length(json_array);
+    for (int i = 0; i < json_len; i++) {
+        json_object *element = json_object_array_get_idx(json_array, i);
+        if (element) {
+            json_object_get(element);
+            json_object_array_add(combined_array, element);
+        }
+    }
+    int adguard_len = json_object_array_length(adguard_array);
+    for (int i = 0; i < adguard_len; i++) {
+        json_object *element = json_object_array_get_idx(adguard_array, i);
+        if (element) {
+            json_object_get(element);
+            json_object_array_add(combined_array, element);
+        }
+    }
+    json_object_put(json_array);
+    json_object_put(adguard_array);
+
+    const char *json_string = json_object_to_json_string(combined_array);
+    char *result = strdup(json_string);
+    if (result) {
+        int total_filters = json_object_array_length(combined_array);
+        printf(
+            "[Swb Adblock] Final combined filter list created with %d total filters "
+            "(%d JSON + %d AdGuard)\n",
+            total_filters, json_len, adguard_len
+        );
+    }
+    json_object_put(combined_array);
+    return result;
 }

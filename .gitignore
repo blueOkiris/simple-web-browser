@@ -10,3 +10,11 @@ swb
 mxe-*/
 *.tar.xz
 webkitgtk-*/
+
+# Swift
+.build/
+v*.tar.gz
+SafariConverterLib-*/
+*.resolved
+swift-*.tar.gz
+swift-*/
