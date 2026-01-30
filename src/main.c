@@ -173,6 +173,9 @@ static void on_activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(win, "key-press-event", G_CALLBACK(on_key_press), NULL);
     g_signal_connect(notebook, "switch-page", G_CALLBACK(on_tab_switched), NULL);
 
+    // Create an initial tab so plugin loading happens during startup
+    notebook__spawn_tab(GTK_NOTEBOOK(notebook), NULL);
+
     gtk_widget_show_all(win);
 }
 
