@@ -47,25 +47,25 @@ static const char *FILTER_LIST_URLS_ADGUARD[] = {
     ADGUARD_URL_BASE "BaseFilter/sections/specific.txt",
 
     // AdGuard Annoyances Filter
-    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_allowlist.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_general.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_specific.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_allowlist.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_general.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_specific.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/annoyances.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/self-promo.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/tweaks.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/antiadblock.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_allowlist.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_general.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_specific.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_allowlist.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_general.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_specific.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_allowlist.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_general.txt"
-    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_specific.txt"
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_allowlist.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_general.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Cookies/sections/cookies_specific.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_allowlist.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_general.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/MobileApp/sections/mobile-app_specific.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/annoyances.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/self-promo.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Other/sections/tweaks.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/antiadblock.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_allowlist.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_general.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/popups_specific.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_allowlist.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_general.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/push-notifications_specific.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_allowlist.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_general.txt",
+    ADGUARD_URL_BASE "AnnoyancesFilter/Popups/sections/subscriptions_specific.txt",
     ADGUARD_URL_BASE "AnnoyancesFilter/Widgets/sections/widgets.txt"
 };
 
@@ -73,12 +73,30 @@ bool FILTER_LIST_REFRESHED = false;
 static WebKitUserContentFilterStore *FILTER_STORE = NULL;
 static GtkNotebook *NOTEBOOK = NULL; // Reference to the main content
 
+typedef enum {
+    FILTER_SAVE_PRIMARY = 0,
+    FILTER_SAVE_FALLBACK_JSON_ONLY
+} filter_save_mode_t;
+
+typedef struct {
+    WebKitUserContentManager *conmgr;
+    GBytes *bytes;
+    filter_save_mode_t mode;
+} filter_save_ctx_t;
+
 static void on_filter_load(GObject *caller, GAsyncResult *res, void *conmgr);
 static void on_filter_save(GObject *caller, GAsyncResult *res, void *conmgr);
+static void save_filter_list_async(
+    WebKitUserContentManager *conmgr,
+    char *filter_list,
+    filter_save_mode_t mode
+);
 static char *get_filter_list(void);
 static char *fetch_url_to_string(const char *url);
 static char *combine_json_arrays(void);
 static char *convert_adguard_rules_to_json(void);
+static char *sanitize_adguard_rules(const char *rules);
+static bool should_skip_adguard_rule(const char *line);
 
 // When the plugin first gets loaded in. Return Major version supported
 int plugin__on_load(void) {
@@ -155,28 +173,86 @@ static void on_filter_load(GObject *caller, GAsyncResult *res, void *conmgr) {
         }
 
         char *filter_list = get_filter_list();
-        GBytes *bytes = g_bytes_new_static(filter_list, strlen(filter_list));
-        webkit_user_content_filter_store_save(
-            FILTER_STORE, "blocklist", bytes, NULL, on_filter_save, conmgr
-        );
-        g_bytes_unref(bytes);
-        free(filter_list);
+        if (filter_list == NULL) {
+            printf("[Swb Adblock] Error! Failed to build filter list\n");
+            return;
+        }
+        save_filter_list_async(WEBKIT_USER_CONTENT_MANAGER(conmgr), filter_list, FILTER_SAVE_PRIMARY);
 
         FILTER_LIST_REFRESHED = true;
     }
 }
 
 static void on_filter_save(GObject *caller, GAsyncResult *res, void *conmgr) {
+    filter_save_ctx_t *ctx = (filter_save_ctx_t *)conmgr;
     GError *error = NULL;
     WebKitUserContentFilter *filter = webkit_user_content_filter_store_save_finish(
         FILTER_STORE, res, &error
     );
+
     if (error == NULL) {
         printf("[Swb Adblock] Saved new filter list\n");
-        webkit_user_content_manager_add_filter(WEBKIT_USER_CONTENT_MANAGER(conmgr), filter);
+        webkit_user_content_manager_add_filter(ctx->conmgr, filter);
+
+        if (ctx->mode == FILTER_SAVE_FALLBACK_JSON_ONLY) {
+            printf("[Swb Adblock] Applied fallback JSON-only blocklist\n");
+        }
     } else {
-        printf("[Swb Adblock] Error! Failed to save filter list: %s\n", error->message);
+        if (ctx->mode == FILTER_SAVE_PRIMARY) {
+            printf("[Swb Adblock] Warning! Primary blocklist save failed: %s\n", error->message);
+
+            char *fallback_filter_list = combine_json_arrays();
+            if (fallback_filter_list != NULL) {
+                printf("[Swb Adblock] Retrying with fallback JSON-only blocklist\n");
+                save_filter_list_async(
+                    ctx->conmgr,
+                    fallback_filter_list,
+                    FILTER_SAVE_FALLBACK_JSON_ONLY
+                );
+            } else {
+                printf("[Swb Adblock] Error! Failed to build fallback JSON-only blocklist\n");
+            }
+        } else {
+            printf("[Swb Adblock] Error! Failed to save fallback filter list: %s\n", error->message);
+        }
+        g_error_free(error);
     }
+
+    if (ctx != NULL) {
+        if (ctx->bytes != NULL) {
+            g_bytes_unref(ctx->bytes);
+        }
+        if (ctx->conmgr != NULL) {
+            g_object_unref(ctx->conmgr);
+        }
+        free(ctx);
+    }
+}
+
+static void save_filter_list_async(
+    WebKitUserContentManager *conmgr,
+    char *filter_list,
+    filter_save_mode_t mode
+) {
+    filter_save_ctx_t *ctx = calloc(1, sizeof(filter_save_ctx_t));
+    if (ctx == NULL) {
+        printf("[Swb Adblock] Error: Failed to allocate save context\n");
+        free(filter_list);
+        return;
+    }
+
+    ctx->conmgr = g_object_ref(conmgr);
+    ctx->bytes = g_bytes_new_take((gpointer)filter_list, strlen(filter_list));
+    ctx->mode = mode;
+
+    webkit_user_content_filter_store_save(
+        FILTER_STORE,
+        "blocklist",
+        ctx->bytes,
+        NULL,
+        on_filter_save,
+        ctx
+    );
 }
 
 
@@ -326,6 +402,18 @@ static char *convert_adguard_rules_to_json(void) {
             continue;
         }
 
+        // Remove modifiers/patterns that are known to generate invalid WebKit regex filters
+        char *sanitized_rules = sanitize_adguard_rules(rules_data_array[i]);
+        free(rules_data_array[i]);
+        rules_data_array[i] = sanitized_rules;
+        if (!rules_data_array[i]) {
+            printf(
+                "[Swb Adblock] Warning: Failed to sanitize AdGuard rules from %s\n",
+                FILTER_LIST_URLS_ADGUARD[i]
+            );
+            continue;
+        }
+
         // Convert AdGuard rules to WebKit JSON format
         webkit_json_array[i] = adguard2webkit__convert(rules_data_array[i]);
         if (!webkit_json_array[i]) {
@@ -391,6 +479,116 @@ static char *convert_adguard_rules_to_json(void) {
     }
     json_object_put(combined_array);
     return result;
+}
+
+static bool should_skip_adguard_rule(const char *line) {
+    if (line == NULL || line[0] == '\0') {
+        return true;
+    }
+
+    // Comments / section metadata
+    if (line[0] == '!' || line[0] == '[') {
+        return true;
+    }
+
+    // Cosmetic/HTML filtering rules not supported by content blockers
+    if (
+        strstr(line, "##") != NULL ||
+        strstr(line, "#@#") != NULL ||
+        strstr(line, "#?#") != NULL ||
+        strstr(line, "#$#") != NULL ||
+        strstr(line, "#%#") != NULL ||
+        strstr(line, "#@$#") != NULL
+    ) {
+        return true;
+    }
+
+    // Drop raw regex rules (YARR frequently rejects these from upstream lists)
+    const char *rule_start = line;
+    if (rule_start[0] == '@' && rule_start[1] == '@') {
+        rule_start += 2;
+    }
+    while (*rule_start == '|' || *rule_start == ' ' || *rule_start == '\t') {
+        rule_start++;
+    }
+    if (rule_start[0] == '/') {
+        return true;
+    }
+
+    // Drop modifiers that repeatedly produce unsupported rules in conversion
+    if (
+        strstr(line, "$replace") != NULL ||
+        strstr(line, "$redirect") != NULL ||
+        strstr(line, "$redirect-rule") != NULL ||
+        strstr(line, "$jsonprune") != NULL ||
+        strstr(line, "$removeparam") != NULL ||
+        strstr(line, "$network") != NULL ||
+        strstr(line, "$header") != NULL ||
+        strstr(line, "$to=") != NULL ||
+        strstr(line, "$method=") != NULL ||
+        strstr(line, "$urlskip") != NULL ||
+        strstr(line, "$urltransform") != NULL ||
+        strstr(line, "$xmlprune") != NULL
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+static char *sanitize_adguard_rules(const char *rules) {
+    if (rules == NULL) {
+        return NULL;
+    }
+
+    size_t input_len = strlen(rules);
+    char *out = calloc(input_len + 1, sizeof(char));
+    if (out == NULL) {
+        return NULL;
+    }
+
+    size_t out_len = 0;
+    const char *line_start = rules;
+    while (*line_start != '\0') {
+        const char *line_end = line_start;
+        while (*line_end != '\0' && *line_end != '\n' && *line_end != '\r') {
+            line_end++;
+        }
+
+        // Trim surrounding whitespace
+        const char *trim_start = line_start;
+        while (trim_start < line_end && (*trim_start == ' ' || *trim_start == '\t')) {
+            trim_start++;
+        }
+        const char *trim_end = line_end;
+        while (trim_end > trim_start && (trim_end[-1] == ' ' || trim_end[-1] == '\t')) {
+            trim_end--;
+        }
+
+        size_t line_len = (size_t)(trim_end - trim_start);
+        if (line_len > 0) {
+            char *line = strndup(trim_start, line_len);
+            if (line == NULL) {
+                free(out);
+                return NULL;
+            }
+
+            if (!should_skip_adguard_rule(line)) {
+                memcpy(out + out_len, line, line_len);
+                out_len += line_len;
+                out[out_len++] = '\n';
+            }
+            free(line);
+        }
+
+        while (*line_end == '\n' || *line_end == '\r') {
+            line_end++;
+        }
+        line_start = line_end;
+    }
+
+    out[out_len] = '\0';
+    return out;
 }
 
 static char *get_filter_list(void) {
